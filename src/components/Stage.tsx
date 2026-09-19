@@ -31,7 +31,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   const [stats, setStats] = useState<(StageStats & { receivedAt: number }) | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [showDone, setShowDone] = useState(false);
-  const [selected, setSelected] = useState<Category>("needs_reply");
+  const [selected, setSelected] = useState<Category | "all">("needs_reply");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -61,7 +61,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   useEffect(() => {
     const t = setTimeout(() => {
       const c = store.get("jevmail:selected", "needs_reply");
-      if ((CATEGORY_ORDER as string[]).includes(c)) setSelected(c as Category);
+      if (c === "all" || (CATEGORY_ORDER as string[]).includes(c)) setSelected(c as Category | "all");
       setShowDone(store.get("jevmail:showDone", "0") === "1");
     }, 0);
     return () => clearTimeout(t);
@@ -211,11 +211,12 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   const move = (m: MessageView, c: Category) => { if (c !== m.category) feedback(m, "corrected_category", c); };
 
   const byCat = useMemo(() => {
-    const map: Record<string, MessageView[]> = {};
+    const map: Record<string, MessageView[]> = { all: [] };
     for (const c of CATEGORY_ORDER) map[c] = [];
-    for (const it of items) if (it.category && (showDone || !it.handled)) map[it.category].push(it);
+    for (const it of items) if (it.category && (showDone || !it.handled)) { map[it.category].push(it); map.all.push(it); }
     return map;
   }, [items, showDone]);
+  const selectedLabel = selected === "all" ? "All" : LABEL[selected];
 
   const pending = stats?.lanes.pending ?? 0;
   const compact = !expanded;
@@ -277,7 +278,15 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
           scanning={flights.some((f) => f.gate)}
           onLaneSettled={() => setTrackReady(expanded && mode !== "fetching")}
         />
-        <div className="mt-12 grid grid-cols-5 items-end gap-4 max-md:grid-cols-3 max-md:gap-y-10">
+        <div className="mt-12 grid grid-cols-6 items-end gap-4 max-md:grid-cols-3 max-md:gap-y-10">
+          <Column
+            label="All"
+            tone="#48484a"
+            count={byCat.all.length}
+            selected={selected === "all"}
+            compact={compact}
+            onClick={() => { setSelected("all"); setSelectedId(null); }}
+          />
           {CATEGORY_ORDER.map((c) => (
             <Column
               key={c}
@@ -304,7 +313,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
       <section className="mt-14">
         <div className="mb-4 flex items-baseline justify-between gap-6">
           <h2 className="text-[15px] font-semibold text-ink">
-            {LABEL[selected]} <span className="ml-1 text-[12px] font-normal tabular-nums text-ash">{byCat[selected].length}</span>
+            {selectedLabel} <span className="ml-1 text-[12px] font-normal tabular-nums text-ash">{byCat[selected].length}</span>
           </h2>
           <input
             value={query}
@@ -331,7 +340,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
             onSelect={setSelectedId}
             onDone={done}
             onMove={move}
-            emptyText={firstSync ? "Fetching your inbox. Sorting starts when that finishes." : pending > 0 ? "Sorting…" : selected === "needs_reply" ? "Nothing needs a reply." : `Nothing in ${LABEL[selected]}.`}
+            emptyText={firstSync ? "Fetching your inbox. Sorting starts when that finishes." : pending > 0 ? "Sorting…" : selected === "needs_reply" ? "Nothing needs a reply." : `Nothing in ${selectedLabel}.`}
           />
         )}
       </section>
