@@ -10,6 +10,7 @@ import ProgressBar, { LANE_H, type BarMode } from "./stage/ProgressBar";
 import Column from "./stage/Column";
 import MessageList, { LABEL } from "./MessageList";
 import { cn } from "@/lib/utils";
+import Key from "./Key";
 
 const MAX_FLIGHTS = 4;   // previews on the track are a sample; stacks and counts carry the full rate
 const RELEASE_MS = 320;  // one preview leaves the source at most this often
@@ -395,7 +396,12 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
           Sorted by Jev
           {stats && stats.classified > 0 && <> · {stats.classified.toLocaleString()} emails · {usd(stats.usd)}</>}
         </span>
-        <span><kbd>j</kbd> <kbd>k</kbd> move · <kbd>e</kbd> done · <kbd>o</kbd> open · <kbd>esc</kbd> close</span>
+        <span className="flex items-center gap-3">
+          <span className="flex items-center gap-1"><Key>j</Key><Key>k</Key> move</span>
+          <span className="flex items-center gap-1"><Key>e</Key> done</span>
+          <span className="flex items-center gap-1"><Key>o</Key> open</span>
+          <span className="flex items-center gap-1"><Key>esc</Key> close</span>
+        </span>
       </footer>
 
       <AnimatePresence>

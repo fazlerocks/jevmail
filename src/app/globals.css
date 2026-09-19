@@ -140,6 +140,20 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ScrollArea: the custom thumb is the only scrollbar; hide the native one inside the viewport */
+[data-slot="scroll-area-viewport"] {
+  scrollbar-width: none;
+}
+[data-slot="scroll-area-viewport"]::-webkit-scrollbar {
+  display: none;
+}
+[data-slot="scroll-area-scrollbar"] {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  right: 3px;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -149,7 +163,5 @@
   }
   html {
     @apply font-sans;
-    /* reserve the scrollbar so content never shifts when a list gets shorter */
-    scrollbar-gutter: stable;
   }
 }

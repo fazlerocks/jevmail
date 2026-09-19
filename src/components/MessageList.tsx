@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Check, ExternalLink, FolderInput, Undo2 } from "lucide-react";
+import Key from "@/components/Key";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -61,7 +62,7 @@ function Row({ m, active, unread, onOpen, onDone }: {
   );
 }
 
-const pill = "inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[12px] font-medium text-ink transition-colors hover:bg-hair";
+const cta = "inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[12.5px] font-medium text-white shadow-[0_1px_2px_rgba(0,0,0,0.12)] transition-opacity hover:opacity-90 [&_svg]:size-3.5";
 
 function Reading({ m, onDone, onMove }: { m: MessageView; onDone: () => void; onMove: (c: Category) => void }) {
   const initial = (m.fromName || m.fromEmail).trim()[0]?.toUpperCase() ?? "?";
@@ -77,11 +78,15 @@ function Reading({ m, onDone, onMove }: { m: MessageView; onDone: () => void; on
         <span className="shrink-0 text-[12px] tabular-nums text-ash">{new Date(m.receivedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
       </div>
       <div className="mt-5 flex flex-wrap items-center gap-2 border-b border-hair pb-5">
-        <a href={m.gmailUrl} target="_blank" rel="noreferrer" className={pill}>Open in Gmail <kbd className="text-[10px] text-ash">o</kbd></a>
-        <button onClick={onDone} className={pill}>{m.handled ? "Undo done" : "Done"} <kbd className="text-[10px] text-ash">e</kbd></button>
+        <a href={m.gmailUrl} target="_blank" rel="noreferrer" className={cn(cta, "bg-shu")}>
+          <ExternalLink /> Open in Gmail <Key className="border-white/30 bg-white/15 text-white/90 shadow-none">o</Key>
+        </a>
+        <button onClick={onDone} className={cn(cta, m.handled ? "bg-stone" : "bg-matcha")}>
+          {m.handled ? <Undo2 /> : <Check />} {m.handled ? "Undo done" : "Done"} <Key className="border-white/30 bg-white/15 text-white/90 shadow-none">e</Key>
+        </button>
         <DropdownMenu>
-          <DropdownMenuTrigger className={pill}>
-            {m.category ? LABEL[m.category] : "Sorting…"} <ChevronDown className="size-3 text-ash" />
+          <DropdownMenuTrigger className={cn(cta, "bg-white text-ink")}>
+            <FolderInput className="text-ash" /> {m.category ? LABEL[m.category] : "Sorting…"} <ChevronDown className="size-3 text-ash" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {(Object.keys(LABEL) as Category[]).filter((c) => c !== m.category).map((c) => (
@@ -188,7 +193,7 @@ export default function MessageList({ items, query, selectedId, onSelect, onDone
           ) : (
             <div className="hidden h-full flex-col items-center justify-center gap-2 text-center lg:flex">
               <span className="text-[13px] text-ash">No message selected</span>
-              <span className="text-[11px] text-ash/70">j and k to move, enter to open</span>
+              <span className="flex items-center gap-1.5 text-[11px] text-ash/70"><Key>j</Key><Key>k</Key> to move</span>
             </div>
           )}
         </div>
