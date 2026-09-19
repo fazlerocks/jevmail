@@ -11,13 +11,13 @@ export function missingEnv(): string[] {
 
 export const env = {
   databaseUrl: process.env.DATABASE_URL ?? "file:./data/jevmail.db",
-  syncLookbackDays: Number(process.env.SYNC_LOOKBACK_DAYS ?? 7),
+  /** Newest inbox messages pulled on first sync, and max new messages per later sync. */
+  syncLimit: Number(process.env.SYNC_LIMIT ?? 20),
   maxBodyChars: Number(process.env.MAX_BODY_CHARS ?? 2000),
-  syncMaxPerRun: Number(process.env.SYNC_MAX_PER_RUN ?? 250),
   jevMinIntervalMs: Number(process.env.JEV_MIN_INTERVAL_MS ?? 0),
   /** How many Jev calls the free tier allows per window (measured: 5). */
   jevBurst: Number(process.env.JEV_BURST ?? 5),
-  /** Background drain tick. Set to 0 to disable. */
-  jevDrainIntervalMs: Number(process.env.JEV_DRAIN_INTERVAL_MS ?? 5 * 60_000),
+  /** Background drain tick. Measured free-tier window is 5 calls per 299 s; 310 s keeps a margin. Set 0 to disable. */
+  jevDrainIntervalMs: Number(process.env.JEV_DRAIN_INTERVAL_MS ?? 310_000),
   hasGatewayKey: () => Boolean(process.env.AI_GATEWAY_API_KEY),
 };

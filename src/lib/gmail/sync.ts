@@ -46,24 +46,13 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   }
 }
 
-async function listInboxIds(gmail: Gmail, days: number): Promise<string[]> {
-  const ids: string[] = [];
-  let pageToken: string | undefined;
-  do {
-    const res = await withRetry(
-      () =>
-        gmail.users.messages.list({
-          userId: "me",
-          q: `in:inbox newer_than:${days}d`,
-          maxResults: 500,
-          pageToken,
-        }),
-      "messages.list",
-    );
-    for (const m of res.data.messages ?? []) if (m.id) ids.push(m.id);
-    pageToken = res.data.nextPageToken ?? undefined;
-  } while (pageToken);
-  return ids;
+/** The newest `limit` inbox messages. Gmail returns them newest first. */
+async function listInboxIds(gmail: Gmail, limit: number): Promise<string[]> {
+  const res = await withRetry(
+    () => gmail.users.messages.list({ userId: "me", q: "in:inbox", maxResults: limit }),
+    "messages.list",
+  );
+  return (res.data.messages ?? []).map((m) => m.id!).filter(Boolean);
 }
 
 async function listHistoryIds(gmail: Gmail, startHistoryId: string): Promise<{ ids: string[]; historyId: string }> {
@@ -170,7 +159,7 @@ export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchR
   } else {
     // Take the history id before listing so nothing arriving mid-sync is missed.
     nextHistoryId = await currentHistoryId(gmail);
-    candidateIds = await listInboxIds(gmail, env.syncLookbackDays);
+    candidateIds = await listInboxIds(gmail, env.syncLimit);
     mode = "full";
   }
 
@@ -182,10 +171,10 @@ export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchR
     }
   }
   const newIds = candidateIds.filter((id) => !known.has(id));
-  const toFetch = newIds.slice(0, env.syncMaxPerRun);
+  const toFetch = newIds.slice(0, env.syncLimit);
   const remaining = newIds.length - toFetch.length;
 
-  const sent = toFetch.length ? await sentThreadIds(gmail, env.syncLookbackDays + 30) : new Set<string>();
+  const sent = toFetch.length ? await sentThreadIds(gmail, 60) : new Set<string>();
 
   const inserted: StoredMessage[] = [];
   for (let i = 0; i < toFetch.length; i += BATCH) {
@@ -215,7 +204,7 @@ export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchR
   // Only advance the bookmark once every candidate has been pulled; otherwise
   // the next run re-lists and skips what is already stored.
   if (remaining === 0) setSyncState(db, nextHistoryId);
-  else db.update(schema.syncState).set({ lastSyncedAt: Date.now() }).where(eq(schema.syncState.id, 1)).run();
+  else setSyncState(db, state?.lastHistoryId ?? null);
 
   return { inserted, remaining, mode };
 }

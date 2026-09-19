@@ -54,8 +54,19 @@ const samples: { name: string; expect: string[]; input: ClassifyInput }[] = [
     },
   },
   {
+    name: "bank transaction alert",
+    expect: ["updates"],
+    input: {
+      ...base,
+      fromName: "ICICI Bank",
+      fromEmail: "credit_cards@icicibank.com",
+      subject: "Transaction alert for your ICICI Bank Credit Card",
+      snippet: "Dear Customer, your ICICI Bank Credit Card XX0006 has been used for a transaction of INR 1,293.93 on 19-Sep-2026. If not done by you, call 1800 xxxx.",
+    },
+  },
+  {
     name: "ambiguous: receipt that mentions a problem",
-    expect: ["promotional", "needs_reply"],
+    expect: ["updates", "needs_reply"],
     input: {
       ...base,
       fromName: "Acme Billing",

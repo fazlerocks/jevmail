@@ -6,6 +6,7 @@ import type { Category } from "@/db/schema";
 
 const LANES: { key: Lane; label: string }[] = [
   { key: "needs_reply", label: "Needs reply" },
+  { key: "updates", label: "Updates" },
   { key: "promotional", label: "Promotional" },
   { key: "sales", label: "Sales" },
   { key: "spam", label: "Spam" },
@@ -13,6 +14,7 @@ const LANES: { key: Lane; label: string }[] = [
 ];
 const CATEGORY_LABEL: Record<Category, string> = {
   needs_reply: "Needs reply",
+  updates: "Updates",
   promotional: "Promotional",
   sales: "Sales",
   spam: "Spam",
@@ -167,7 +169,7 @@ export default function Inbox() {
 
       {/* Stats strip */}
       {stats && (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
           {LANES.map((l) => (
             <button
               key={l.key}
@@ -215,7 +217,7 @@ export default function Inbox() {
         <div className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
           {neverSynced && total === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-sm text-zinc-500">Nothing pulled yet. Sync reads your last 7 days of inbox mail.</p>
+              <p className="text-sm text-zinc-500">Nothing pulled yet. Sync reads your 20 newest inbox messages.</p>
               <button onClick={sync} disabled={syncing} className="mt-3 rounded-md bg-zinc-900 px-3 py-1.5 text-sm text-white dark:bg-white dark:text-zinc-900">
                 {syncing ? "Syncing…" : "Sync now"}
               </button>

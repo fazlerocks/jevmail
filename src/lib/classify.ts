@@ -22,6 +22,17 @@ export type Classification = {
   model: string;
 };
 
+/** Remove tracking URLs, markdown image syntax, and angle-bracketed links that add noise without signal. */
+export function stripNoise(text: string): string {
+  return text
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/<https?:\/\/[^>]+>/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 export function buildState(m: ClassifyInput): string {
   return [
     `From: ${m.fromName} <${m.fromEmail}>`,
@@ -31,7 +42,7 @@ export function buildState(m: ClassifyInput): string {
     `User has previously replied in this thread: ${m.isReplyToMe ? "yes" : "no"}`,
     "",
     "Body:",
-    m.snippet || "(empty)",
+    stripNoise(m.snippet) || "(empty)",
   ].join("\n");
 }
 
@@ -43,8 +54,10 @@ const QUESTIONS = {
     criteria: {
       needs_reply:
         "A real person expects a reply from the recipient: a colleague, customer, friend, or existing contact asking something or continuing a conversation.",
+      updates:
+        "Transactional or informational mail about the recipient's own accounts and activity: bank and card transaction alerts, OTPs and security notices, order, delivery, and booking status, receipts and invoices, bill reminders, service alarms, calendar or system notifications. Automated, addressed to the recipient, not trying to sell anything.",
       promotional:
-        "Newsletters, marketing campaigns, product updates, receipts, order confirmations, and automated notifications from services the recipient uses.",
+        "Marketing: newsletters, campaigns, discounts, product announcements, event invitations, and content digests sent to a list. Usually has an unsubscribe link and is not about a specific transaction of the recipient.",
       sales:
         "Unsolicited cold outreach from a vendor, agency, or recruiter trying to start a conversation or book a call with the recipient.",
       spam: "Scams, phishing, fake invoices, or junk with no legitimate purpose.",

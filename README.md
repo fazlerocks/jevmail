@@ -2,7 +2,7 @@
 
 A local, read-only Gmail triage board sorted by [Jev](https://vercel.com/ai-gateway/models/jev), TypeSafe AI's decision model, through Vercel AI Gateway.
 
-Every new inbox message lands in one of four lanes: **Needs reply**, **Promotional**, **Sales**, or **Spam**, with a 1–5 urgency score. Jev returns typed probabilities instead of text, so there is nothing to parse and nothing to hallucinate.
+Every new inbox message lands in one of five lanes: **Needs reply**, **Updates** (transactional: bank alerts, deliveries, receipts, OTPs), **Promotional**, **Sales**, or **Spam**, with a 1–5 urgency score. Jev returns typed probabilities instead of text, so there is nothing to parse and nothing to hallucinate.
 
 ## The read-only guarantee
 
@@ -40,8 +40,9 @@ Open http://localhost:3000, sign in, click **Sync**.
 
 ## How it works
 
-- First sync lists inbox mail from the last `SYNC_LOOKBACK_DAYS` and stores a Gmail history ID. Each Sync click pulls at most `SYNC_MAX_PER_RUN` new messages (default 250), paced under Gmail's per-minute quota, and saves every batch as it lands. Click again to continue a large backlog.
+- First sync pulls your `SYNC_LIMIT` newest inbox messages (default 20) and stores a Gmail history ID.
 - Later syncs ask Gmail for inbox additions since that ID. If the ID has expired (404), it falls back to a full pull. Known messages are skipped by ID, so nothing duplicates.
+- Vercel's free tier allows about 5 Jev calls per 5-minute window. Sync classifies the first 5 right away; a background timer inside the app classifies 5 more every 5 minutes until the Pending lane is empty. Buying any AI Gateway credits removes the limit.
 - Each new message becomes a plain-text state block (sender, subject, headers, trimmed body) and one `experimental_evaluate` call to `typesafe-ai/jev` with three questions: lane (choice), urgency (score), and whether a human wrote it to you (boolean).
 - Corrections and handled flags are stored as feedback rows. The original Jev answer is preserved so the agreement rate stays honest.
 

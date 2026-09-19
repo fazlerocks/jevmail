@@ -58,6 +58,9 @@ function extractBody(payload: Part | undefined): string {
 export function cleanText(s: string, max = env.maxBodyChars): string {
   const collapsed = s
     .replace(/\r/g, "")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/<https?:\/\/[^>]+>/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")

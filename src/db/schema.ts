@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
-export const CATEGORIES = ["needs_reply", "promotional", "sales", "spam"] as const;
+export const CATEGORIES = ["needs_reply", "updates", "promotional", "sales", "spam"] as const;
 export type Category = (typeof CATEGORIES)[number];
 
 export const messages = sqliteTable(
