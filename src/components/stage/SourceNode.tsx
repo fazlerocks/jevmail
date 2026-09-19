@@ -20,7 +20,11 @@ const SourceNode = forwardRef<HTMLDivElement, {
       </div>
       <div className="mt-2.5 flex items-center gap-2 whitespace-nowrap text-[12px] tracking-[0.02em] text-ash">
         <GmailMark />
-        {syncing ? (phase === "listing" ? "Fetching…" : `${done.toLocaleString()} of ${total.toLocaleString()}`) : "Gmail"}
+        <span className={pulled > 0 || syncing ? "text-ink" : undefined}>
+          {syncing
+            ? (phase === "listing" ? "Fetching inbox…" : `Fetching ${done.toLocaleString()} of ${total.toLocaleString()}`)
+            : pulled > 0 ? "Gmail inbox" : "Not fetched yet"}
+        </span>
       </div>
     </div>
   );
