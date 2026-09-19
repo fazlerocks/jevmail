@@ -102,7 +102,7 @@ function MessageCard({ m, open, onToggle, onDone, onMove, compact }: {
       <CollapsibleContent className={cn(compact ? "px-3 pb-3" : "px-4 pb-4 pl-[68px]")}>
         <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-foreground/80">{m.snippet || "(empty)"}</p>
         <div className="mt-3 flex flex-wrap items-center gap-1">
-          <Button variant="ghost" size="sm" render={<a href={m.gmailUrl} target="_blank" rel="noreferrer" />} className="text-blue-600">
+          <Button variant="ghost" size="sm" render={<a href={m.gmailUrl} target="_blank" rel="noreferrer" />} nativeButton={false} className="text-blue-600">
             Open in Gmail <ArrowUpRight />
           </Button>
           <Button variant="ghost" size="sm" onClick={onDone}><Check /> {m.handled ? "Move to inbox" : "Done"}</Button>
