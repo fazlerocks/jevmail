@@ -1,7 +1,7 @@
 import { requireSession } from "@/lib/session";
 import { db, schema } from "@/db";
 import { gmailClient } from "@/lib/gmail/client";
-import { fetchNewMessages } from "@/lib/gmail/sync";
+import { fetchNewMessages, unclassifiedMessages } from "@/lib/gmail/sync";
 import { classifyMessage, GatewayForbiddenError } from "@/lib/classify";
 import { env } from "@/lib/env";
 
@@ -21,13 +21,18 @@ export async function POST() {
   let classified = 0;
   let failed = 0;
   let gatewayError: string | null = null;
+  let remaining = 0;
 
   try {
     const gmail = gmailClient(session.accessToken!);
-    const { inserted } = await fetchNewMessages(gmail, db);
-    fetched = inserted.length;
+    const result = await fetchNewMessages(gmail, db);
+    fetched = result.inserted.length;
+    remaining = result.remaining;
 
-    for (const m of inserted) {
+    // Retry anything stored earlier that still lacks a classification, then the new ones.
+    const toClassify = [...unclassifiedMessages(db).filter((m) => !result.inserted.some((n) => n.id === m.id)), ...result.inserted];
+
+    for (const m of toClassify) {
       if (gatewayError) break;
       try {
         const c = await classifyMessage(m);
@@ -48,14 +53,15 @@ export async function POST() {
     return Response.json({
       fetched,
       classified,
-      failed: failed + (gatewayError ? fetched - classified - failed : 0),
+      failed: failed + (gatewayError ? Math.max(0, toClassify.length - classified - failed) : 0),
+      remaining,
       durationMs: Date.now() - started,
       error: gatewayError,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[sync]", err);
-    return Response.json({ error: message, fetched, classified, failed }, { status: 500 });
+    return Response.json({ error: message, fetched, classified, failed, remaining }, { status: 500 });
   } finally {
     g.__jevmailSyncLock = false;
   }

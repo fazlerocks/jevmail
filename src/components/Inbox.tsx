@@ -78,7 +78,11 @@ export default function Inbox() {
       const d = await r.json();
       if (!r.ok) setToast(`Sync failed: ${d.error ?? r.status}`);
       else if (d.error) setToast(`Fetched ${d.fetched}, classified ${d.classified}. Gateway: ${d.error}`);
-      else setToast(`Fetched ${d.fetched}, classified ${d.classified}${d.failed ? `, ${d.failed} pending` : ""} in ${(d.durationMs / 1000).toFixed(1)}s`);
+      else
+        setToast(
+          `Fetched ${d.fetched}, classified ${d.classified}${d.failed ? `, ${d.failed} pending` : ""} in ${(d.durationMs / 1000).toFixed(1)}s` +
+            (d.remaining ? `. ${d.remaining} more to pull, click Sync again.` : ""),
+        );
       await load();
     } catch (e) {
       setToast(`Sync failed: ${e instanceof Error ? e.message : String(e)}`);

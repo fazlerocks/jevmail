@@ -8,7 +8,7 @@ Every new inbox message lands in one of four lanes: **Needs reply**, **Promotion
 
 Jevmail requests a single Gmail scope, `gmail.readonly`. It cannot mark mail read, add labels, archive, report spam, or send. Google enforces this at the OAuth layer, not the app. All app state (lanes, corrections, handled flags) lives in a local SQLite file.
 
-The only Gmail methods used: `messages.list`, `messages.get`, `threads.get`, `history.list`, `getProfile`.
+The only Gmail methods used: `messages.list`, `messages.get`, `threads.list`, `history.list`, `getProfile`.
 
 ## Setup
 
@@ -40,7 +40,7 @@ Open http://localhost:3000, sign in, click **Sync**.
 
 ## How it works
 
-- First sync lists inbox mail from the last `SYNC_LOOKBACK_DAYS` and stores a Gmail history ID.
+- First sync lists inbox mail from the last `SYNC_LOOKBACK_DAYS` and stores a Gmail history ID. Each Sync click pulls at most `SYNC_MAX_PER_RUN` new messages (default 250), paced under Gmail's per-minute quota, and saves every batch as it lands. Click again to continue a large backlog.
 - Later syncs ask Gmail for inbox additions since that ID. If the ID has expired (404), it falls back to a full pull. Known messages are skipped by ID, so nothing duplicates.
 - Each new message becomes a plain-text state block (sender, subject, headers, trimmed body) and one `experimental_evaluate` call to `typesafe-ai/jev` with three questions: lane (choice), urgency (score), and whether a human wrote it to you (boolean).
 - Corrections and handled flags are stored as feedback rows. The original Jev answer is preserved so the agreement rate stays honest.
