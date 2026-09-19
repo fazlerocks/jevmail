@@ -76,8 +76,8 @@ export class Simulator implements StageApi {
 
   async sync(older = false) {
     if (this.syncState.active) return { ok: false, error: "already running" };
-    if (older && !this.msgs.some((m) => !m.fetched)) this.grow(this.total);
-    const toFetch = this.msgs.filter((m) => !m.fetched).slice(0, this.total);
+    if (older && !this.msgs.some((m) => !m.fetched)) this.grow(100);
+    const toFetch = this.msgs.filter((m) => !m.fetched).slice(0, older ? 100 : this.total);
     this.syncState = { active: true, phase: "listing", done: 0, total: toFetch.length, startedAt: Date.now() };
     await new Promise((r) => setTimeout(r, 400));
     this.syncState.phase = "fetching";

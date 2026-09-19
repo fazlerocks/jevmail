@@ -197,7 +197,7 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean): Prom
 
   if (older) {
     // "Fetch more": reach further back. The history bookmark is left untouched.
-    candidateIds = await listOlderInboxIds(gmail, db, env.syncLimit);
+    candidateIds = await listOlderInboxIds(gmail, db, env.fetchMoreLimit);
     nextHistoryId = state?.lastHistoryId ?? (await currentHistoryId(gmail));
     mode = "older";
   } else if (state?.lastHistoryId) {
@@ -229,7 +229,7 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean): Prom
     }
   }
   const newIds = candidateIds.filter((id) => !known.has(id));
-  const toFetch = newIds.slice(0, env.syncLimit);
+  const toFetch = newIds.slice(0, older ? env.fetchMoreLimit : env.syncLimit);
   const remaining = newIds.length - toFetch.length;
 
   const sent = toFetch.length ? await sentThreadIds(gmail, 60) : new Set<string>();

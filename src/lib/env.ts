@@ -13,6 +13,8 @@ export const env = {
   databaseUrl: process.env.DATABASE_URL ?? "file:./data/jevmail.db",
   /** Newest inbox messages pulled on first sync, and max new messages per later sync. */
   syncLimit: Number(process.env.SYNC_LIMIT ?? 20),
+  /** Older messages pulled per "Fetch more" click. */
+  fetchMoreLimit: Number(process.env.FETCH_MORE_LIMIT ?? 100),
   maxBodyChars: Number(process.env.MAX_BODY_CHARS ?? 2000),
   jevMinIntervalMs: Number(process.env.JEV_MIN_INTERVAL_MS ?? 0),
   /** How many Jev calls the free tier allows per window (measured: 5). */
