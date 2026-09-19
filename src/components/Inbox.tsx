@@ -84,7 +84,7 @@ function MessageCard({ m, open, onToggle, onDone, onMove, compact }: {
   const urgent = (m.urgency ?? 0) >= 4;
   const body = (
     <Collapsible open={open} onOpenChange={onToggle} className="group">
-      <CollapsibleTrigger render={<div />} className={cn("flex w-full cursor-pointer items-start gap-3 text-left", compact ? "px-3 py-2.5" : "px-4 py-3.5")}>
+      <CollapsibleTrigger render={<div />} nativeButton={false} className={cn("flex w-full cursor-pointer items-start gap-3 text-left", compact ? "px-3 py-2.5" : "px-4 py-3.5")}>
         {!compact && <Avatar name={m.fromName || m.fromEmail} />}
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
@@ -129,7 +129,7 @@ function Bundle({ label, tone, items, open, onToggle, openId, setOpenId, onDone,
   return (
     <Card className="gap-0 py-0">
       <Collapsible open={open} onOpenChange={onToggle} className="group">
-        <CollapsibleTrigger render={<div />} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left">
+        <CollapsibleTrigger render={<div />} nativeButton={false} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left">
           <Avatar tone={tone}><InboxIcon className="size-4" /></Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
