@@ -53,7 +53,6 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   const flightCount = useRef(0);
   const inFlight = useRef(false);
   const prevRunActive = useRef(false);
-  const autoSynced = useRef(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const stageRef = useRef<HTMLDivElement>(null);
@@ -188,15 +187,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
     }
   }, [api, syncing, load, say]);
 
-  // First visit with an empty inbox: fetch once. After that, syncing is manual.
-  useEffect(() => {
-    if (!loaded || !stats || autoSynced.current) return;
-    autoSynced.current = true;
-    if (!stats.lastSyncedAt && !stats.sync.active && items.length === 0) {
-      const t = setTimeout(sync, 0);
-      return () => clearTimeout(t);
-    }
-  }, [loaded, stats, items.length, sync]);
+  const neverSynced = loaded && !stats?.lastSyncedAt && !syncActive && items.length === 0;
 
   async function feedback(m: MessageView, kind: FeedbackKind, value?: string) {
     if (kind === "corrected_category" && value && m.category) {
@@ -302,7 +293,15 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
             className="w-48 border-b border-hair bg-transparent py-1 text-[13px] text-ink placeholder:text-ash focus:border-hair-strong focus:outline-none"
           />
         </div>
-        {loaded && (
+        {neverSynced ? (
+          <div className="py-24 text-center">
+            <p className="text-[13px] text-ash">Your inbox hasn&apos;t been fetched yet.</p>
+            <button onClick={sync} className="mt-6 border border-ink px-5 py-2 text-[13px] text-ink transition-colors hover:bg-ink hover:text-paper">
+              Fetch emails
+            </button>
+            <p className="mt-4 text-[12px] text-ash">Sorting starts as soon as the fetch finishes.</p>
+          </div>
+        ) : loaded && (
           <MessageList
             items={byCat[selected]}
             query={query}
