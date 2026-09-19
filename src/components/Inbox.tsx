@@ -157,6 +157,7 @@ export default function Inbox() {
   const [items, setItems] = useState<MessageView[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [filter, setFilter] = useState<"all" | Category>("all");
   const [openId, setOpenId] = useState<string | null>(null);
   const [openBundles, setOpenBundles] = useState<Set<string>>(new Set());
   const [syncing, setSyncing] = useState(false);
@@ -212,14 +213,15 @@ export default function Inbox() {
 
   const days = useMemo(() => {
     const map = new Map<string, MessageView[]>();
-    for (const m of items.filter((m) => showDone || !m.handled)) map.set(dayKey(m.receivedAt), [...(map.get(dayKey(m.receivedAt)) ?? []), m]);
+    const visible = items.filter((m) => (showDone || !m.handled) && (filter === "all" || m.category === filter));
+    for (const m of visible) map.set(dayKey(m.receivedAt), [...(map.get(dayKey(m.receivedAt)) ?? []), m]);
     return [...map.entries()].map(([key, list]) => ({
       key,
       label: dayLabel(list[0].receivedAt),
-      cards: list.filter((m) => m.category === "needs_reply" || m.category === null),
-      bundles: BUNDLES.map((b) => ({ ...b, items: list.filter((m) => m.category === b.key) })).filter((b) => b.items.length),
+      cards: filter === "all" ? list.filter((m) => m.category === "needs_reply" || m.category === null) : list,
+      bundles: filter === "all" ? BUNDLES.map((b) => ({ ...b, items: list.filter((m) => m.category === b.key) })).filter((b) => b.items.length) : [],
     }));
-  }, [items, showDone]);
+  }, [items, showDone, filter]);
 
   const pending = stats?.lanes.pending ?? 0;
   const toggleBundle = (k: string) => setOpenBundles((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
@@ -229,6 +231,25 @@ export default function Inbox() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-24">
+      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 [scrollbar-width:none]">
+        {([{ key: "all", label: "All", tone: "" }, { key: "needs_reply", label: "Needs reply", tone: "bg-blue-500" }, ...BUNDLES] as { key: "all" | Category; label: string; tone: string }[]).map((c) => {
+          const count = c.key === "all" ? Object.entries(stats?.lanes ?? {}).filter(([k]) => k !== "pending").reduce((a, [, n]) => a + n, 0) : stats?.lanes[c.key] ?? 0;
+          const active = filter === c.key;
+          return (
+            <Button
+              key={c.key}
+              variant={active ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFilter(c.key)}
+              className={cn("shrink-0 rounded-full", !active && "bg-background")}
+            >
+              {c.tone && <span className={cn("size-2 rounded-full", c.tone)} />}
+              {c.label}
+              {count > 0 && <span className={cn("text-xs", active ? "opacity-70" : "text-muted-foreground")}>{count}</span>}
+            </Button>
+          );
+        })}
+      </div>
       <div className="flex items-center justify-between py-2 text-[13px] text-muted-foreground">
         <span>{status}</span>
         <Button variant="ghost" size="sm" onClick={sync} disabled={syncing} className="text-blue-600">
@@ -239,8 +260,8 @@ export default function Inbox() {
       {!loaded ? null : days.length === 0 ? (
         <div className="py-24 text-center">
           <div className="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-blue-50 text-blue-500"><Check className="size-6" /></div>
-          <p className="text-[15px]">{stats?.lastSyncedAt ? "You're all done" : "Nothing here yet"}</p>
-          <p className="mt-1 text-[13px] text-muted-foreground">{stats?.lastSyncedAt ? "Everything is handled." : "Sync pulls your 20 newest inbox messages."}</p>
+          <p className="text-[15px]">{filter !== "all" ? `Nothing in ${LABEL[filter]}` : stats?.lastSyncedAt ? "You're all done" : "Nothing here yet"}</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">{filter !== "all" ? "" : stats?.lastSyncedAt ? "Everything is handled." : "Sync pulls your 20 newest inbox messages."}</p>
           {!stats?.lastSyncedAt && (
             <Button onClick={sync} disabled={syncing} className="mt-5 rounded-full bg-blue-600 text-white hover:bg-blue-700">
               {syncing ? "Syncing…" : "Sync now"}
