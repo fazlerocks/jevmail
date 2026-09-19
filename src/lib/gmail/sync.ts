@@ -15,14 +15,11 @@ import { env } from "@/lib/env";
  *   5,000 units per minute, well under the limit.
  */
 
-// Gmail throttles bursts well below its documented 250 units/s. Measured: 120 full
-// message fetches in 4 s triggered a lockout. 10 per 500 ms (20/s, 100 units/s) is
-// steady enough; on a 429 the floor doubles for the rest of the run.
-const BATCH = 10;
-const BATCH_FLOOR_MS = 500;
-// After Gmail throttles once, drop to a rate a low-quota project can sustain (~100 messages/min).
-const SLOW_BATCH = 5;
-const SLOW_FLOOR_MS = 3000;
+// Steady pacing from the first batch. Bursting ahead of the project's per-minute
+// quota only buys a long stall once Gmail answers 403, so fetch at an even rate
+// (GMAIL_RATE_PER_MIN, default 100). After a throttle, halve it for the run.
+const BATCH = 5;
+function floorMs(rate: number) { return Math.max(200, Math.round((BATCH / rate) * 60_000)); }
 
 export type SyncProgress = { active: boolean; phase: "idle" | "listing" | "fetching"; done: number; total: number; startedAt: number | null };
 const sp = globalThis as unknown as { __jevmailSyncProgress?: SyncProgress };
@@ -240,7 +237,7 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean, onChu
   const inserted: StoredMessage[] = [];
   let skipped = 0;
   for (let i = 0; i < toFetch.length; ) {
-    const size = throttled ? SLOW_BATCH : BATCH;
+    const size = BATCH;
     const started = Date.now();
     const batch = await Promise.all(
       toFetch.slice(i, i + size).map(async (id) => {
@@ -270,7 +267,7 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean, onChu
     }
     setProgress({ done: Math.min(toFetch.length, i) });
     if (onChunk && (inserted.length % CHUNK < size || i >= toFetch.length) && inserted.length > 0) onChunk();
-    const floor = throttled ? SLOW_FLOOR_MS : BATCH_FLOOR_MS;
+    const floor = floorMs(throttled ? env.gmailRatePerMin / 2 : env.gmailRatePerMin);
     const elapsed = Date.now() - started;
     if (elapsed < floor && i < toFetch.length) await sleep(floor - elapsed);
   }

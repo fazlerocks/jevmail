@@ -13,6 +13,8 @@ export const env = {
   databaseUrl: process.env.DATABASE_URL ?? "file:./data/jevmail.db",
   /** Newest inbox messages pulled on first sync, and max new messages per later sync. */
   syncLimit: Number(process.env.SYNC_LIMIT ?? 20),
+  /** Gmail fetch pace, messages per minute. Low-quota projects allow ~100; raise after increasing the Gmail API quota. */
+  gmailRatePerMin: Math.max(10, Number(process.env.GMAIL_RATE_PER_MIN ?? 100)),
   /** Older messages pulled per "Fetch more" click. */
   fetchMoreLimit: Number(process.env.FETCH_MORE_LIMIT ?? 100),
   maxBodyChars: Number(process.env.MAX_BODY_CHARS ?? 2000),
