@@ -155,7 +155,7 @@ function Bundle({ label, tone, items, open, onToggle, openId, setOpenId, onDone,
 
 /* ---------- main ---------- */
 
-export default function Inbox() {
+export default function Inbox({ email, signOut }: { email: string; signOut: React.ReactNode }) {
   const [items, setItems] = useState<MessageView[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [showDone, setShowDone] = useState(false);
@@ -231,8 +231,14 @@ export default function Inbox() {
   const status = pending > 0 ? `${pending} still sorting` : stats?.lastSyncedAt ? "All sorted" : "";
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-24">
-      <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 [scrollbar-width:none]">
+    <>
+    <header className="sticky top-0 z-10 bg-background/80 backdrop-blur">
+      <div className="mx-auto w-full max-w-2xl px-4 pt-3 pb-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[17px] font-semibold tracking-tight" title={email}>Jevmail</span>
+          {signOut}
+        </div>
+        <div className="-mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none]">
         {([{ key: "all", label: "All", tone: "" }, { key: "needs_reply", label: "Needs reply", tone: "bg-blue-500" }, ...BUNDLES] as { key: "all" | Category; label: string; tone: string }[]).map((c) => {
           const count = c.key === "all" ? Object.values(stats?.lanes ?? {}).reduce((a, n) => a + n, 0) : stats?.lanes[c.key] ?? 0;
           const active = filter === c.key;
@@ -250,7 +256,10 @@ export default function Inbox() {
             </Button>
           );
         })}
+        </div>
       </div>
+    </header>
+    <div className="mx-auto w-full max-w-2xl px-4 pb-24">
       <div className="flex items-center justify-between py-2 text-[13px] text-muted-foreground">
         <span>{status}</span>
         <Button variant="ghost" size="sm" onClick={sync} disabled={syncing} className="text-blue-600">
@@ -303,5 +312,6 @@ export default function Inbox() {
 
       {toast && <div className="fixed bottom-5 left-1/2 z-30 -translate-x-1/2 rounded-full bg-foreground px-4 py-2 text-[13px] text-background shadow-lg">{toast}</div>}
     </div>
+    </>
   );
 }
