@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "test": "tsx --test src/**/*.test.ts",
-    "db:reset": "rm -f data/jevmail.db data/jevmail.db-shm data/jevmail.db-wal && echo \"database cleared\""
+    "db:reset": "rm -f data/jevmail.db data/jevmail.db-shm data/jevmail.db-wal && echo \"database cleared\"",
+    "sort:reset": "sqlite3 data/jevmail.db \"delete from feedback; delete from classifications;\" && echo \"sorting cleared, messages kept\""
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

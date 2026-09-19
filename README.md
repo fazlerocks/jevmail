@@ -57,6 +57,7 @@ Open http://localhost:3000, sign in, click **Sync**.
 | `pnpm dev` | Start the app |
 | `pnpm test` | Run the five-sample classifier test (skips without a gateway key) |
 | `pnpm db:reset` | Delete the local database to start over (stop the server first) |
+| `pnpm sort:reset` | Forget the sorting and corrections but keep fetched messages, so the next Sync re-sorts without touching Gmail |
 | `pnpm db:generate` | Generate a migration after changing `src/db/schema.ts` |
 | `pnpm db:studio` | Browse the local database |
 
