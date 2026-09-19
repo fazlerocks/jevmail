@@ -379,7 +379,14 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
             <button onClick={() => sync(false)} className="mt-6 rounded-full bg-shu px-5 py-2 text-[13px] font-medium text-white shadow-sm transition-opacity hover:opacity-90">
               Fetch emails
             </button>
-            <p className="mt-4 text-[12px] text-ash">Sorting starts as soon as the fetch finishes.</p>
+            <p className="mt-4 text-[12px] text-ash">Sorting starts as soon as the first 100 have landed.</p>
+          </div>
+        ) : loaded && pending > 0 && !runActive && !syncActive && byCat[selected].length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center rounded-2xl bg-white text-center shadow-[0_1px_3px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.03)]">
+            <p className="text-[13px] text-ash">{pending.toLocaleString()} {pending === 1 ? "email is" : "emails are"} waiting to be sorted.</p>
+            <button onClick={() => api.sort().then(load)} className="mt-6 rounded-full bg-shu px-5 py-2 text-[13px] font-medium text-white shadow-sm transition-opacity hover:opacity-90">
+              Start sorting
+            </button>
           </div>
         ) : loaded && (
           <MessageList
@@ -389,7 +396,7 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
             onSelect={setSelectedId}
             onDone={done}
             onMove={move}
-            emptyText={firstSync ? "Fetching your inbox. Sorting starts when that finishes." : pending > 0 ? "Sorting…" : selected === "needs_reply" ? "Nothing needs a reply." : `Nothing in ${selectedLabel}.`}
+            emptyText={firstSync ? "Fetching your inbox. Sorting starts once the first 100 have landed." : runActive ? "Sorting…" : selected === "needs_reply" ? "Nothing needs a reply." : `Nothing in ${selectedLabel}.`}
           />
         )}
       </section>
