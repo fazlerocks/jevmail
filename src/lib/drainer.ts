@@ -52,7 +52,16 @@ export function startDrainer() {
     state.inTick = true;
     state.lastTickAt = Date.now();
     try {
-      if (unclassifiedMessages(db).length > 0) state.lastResult = await drainOnce();
+      if (unclassifiedMessages(db).length > 0) {
+        state.lastResult = await drainOnce();
+        const left = unclassifiedMessages(db).length;
+        const r = state.lastResult;
+        console.log(
+          `[drain] classified ${r.classified}, ${left} pending, next in ${Math.round(env.jevDrainIntervalMs / 60000)} min` +
+            (r.rateLimited ? " (hit free-tier limit)" : "") +
+            (r.error ? ` error: ${r.error}` : ""),
+        );
+      }
     } catch (err) {
       state.lastResult = { classified: 0, rateLimited: false, error: err instanceof Error ? err.message : String(err) };
     } finally {

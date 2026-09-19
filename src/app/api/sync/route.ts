@@ -57,6 +57,7 @@ export async function POST() {
         }
       }
     }
+    console.log(`[sync] fetched ${fetched}, classified ${classified}, ${unclassifiedMessages(db).length} pending${remaining ? `, ${remaining} more to pull` : ""}`);
     return Response.json({
       fetched,
       classified,
