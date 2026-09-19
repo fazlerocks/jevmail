@@ -4,6 +4,7 @@ import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import Stack, { MAX_LINES } from "./Stack";
 import { COMPACT_LINES } from "./Column";
+import GmailMark from "./GmailMark";
 
 const SourceNode = forwardRef<HTMLDivElement, {
   pulled: number; syncing: boolean; phase: "idle" | "listing" | "fetching"; done: number; total: number; compact: boolean;
@@ -17,8 +18,9 @@ const SourceNode = forwardRef<HTMLDivElement, {
       <div className="mt-3 w-full border-b border-hair-strong">
         <Stack ref={ref} count={shown} maxLines={compact ? COMPACT_LINES : MAX_LINES} />
       </div>
-      <div className="mt-2.5 whitespace-nowrap text-[12px] tracking-[0.02em] text-ash">
-        {syncing ? (phase === "listing" ? "Syncing…" : `Syncing ${done.toLocaleString()} of ${total.toLocaleString()}`) : "Inbox"}
+      <div className="mt-2.5 flex items-center gap-2 whitespace-nowrap text-[12px] tracking-[0.02em] text-ash">
+        <GmailMark />
+        {syncing ? (phase === "listing" ? "Fetching…" : `${done.toLocaleString()} of ${total.toLocaleString()}`) : "Gmail"}
       </div>
     </div>
   );
