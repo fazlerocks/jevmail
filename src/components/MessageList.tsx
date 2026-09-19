@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import type { MessageView } from "@/lib/queries";
 import type { Category } from "@/db/schema";
@@ -45,14 +46,14 @@ function Row({ m, active, unread, onOpen, onDone }: {
     <li
       data-row={m.id}
       onClick={onOpen}
-      className={cn("group relative flex cursor-pointer items-baseline gap-3 rounded-xl py-3 pl-6 pr-3 transition-colors", active ? "bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]" : "hover:bg-white/60")}
+      className={cn("group relative flex cursor-pointer items-baseline gap-3 py-3 pl-7 pr-4 transition-colors", active ? "bg-shu/8" : "hover:bg-paper")}
     >
-      <span className={cn("absolute left-2.5 top-1/2 size-2 -translate-y-1/2 rounded-full", unread ? "bg-shu" : "bg-transparent")} />
-      <span className={cn("w-36 shrink-0 truncate text-[13.5px]", unread ? "text-ink" : "text-ink/80")}>{m.fromName || m.fromEmail}</span>
+      <span className={cn("absolute left-3 top-1/2 size-2 -translate-y-1/2 rounded-full", unread ? "bg-shu" : "bg-transparent")} />
+      <span className={cn("w-32 shrink-0 truncate text-[13.5px]", unread ? "font-semibold text-ink" : "text-ink")}>{m.fromName || m.fromEmail}</span>
       <span className="min-w-0 flex-1 truncate text-[13.5px]">
         {urgent && <span className="mr-1.5 inline-block size-1.5 -translate-y-px rounded-full bg-persimmon align-middle" title="Urgent" />}
-        <span className={cn(unread ? "text-ink" : "text-ink/80")}>{m.subject || "(no subject)"}</span>
-        <span className="text-ash"> — {m.snippet.slice(0, 120)}</span>
+        <span className={cn(unread ? "font-medium text-ink" : "text-ink")}>{m.subject || "(no subject)"}</span>
+        <span className="text-ash"> · {m.snippet.slice(0, 120)}</span>
       </span>
       <span className="shrink-0 text-[12px] tabular-nums text-ash group-hover:hidden">{when(m.receivedAt)}</span>
       <button onClick={(e) => { e.stopPropagation(); onDone(); }} className={cn(textBtn, "hidden shrink-0 group-hover:inline")}>{m.handled ? "Undo" : "Done"}</button>
@@ -60,20 +61,27 @@ function Row({ m, active, unread, onOpen, onDone }: {
   );
 }
 
+const pill = "inline-flex items-center gap-1.5 rounded-full bg-paper px-3 py-1.5 text-[12px] font-medium text-ink transition-colors hover:bg-hair";
+
 function Reading({ m, onDone, onMove }: { m: MessageView; onDone: () => void; onMove: (c: Category) => void }) {
+  const initial = (m.fromName || m.fromEmail).trim()[0]?.toUpperCase() ?? "?";
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-[17px] font-semibold text-ink">{m.subject || "(no subject)"}</h2>
+      <h2 className="text-[18px] font-semibold leading-snug text-ink">{m.subject || "(no subject)"}</h2>
+      <div className="mt-4 flex items-center gap-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-hair text-[14px] font-medium text-ink">{initial}</span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13.5px] font-medium text-ink">{m.fromName || m.fromEmail}</div>
+          <div className="truncate text-[12px] text-ash">{m.fromEmail}</div>
+        </div>
         <span className="shrink-0 text-[12px] tabular-nums text-ash">{new Date(m.receivedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
       </div>
-      <div className="mt-1 text-[12px] text-ash">{m.fromName} <span className="opacity-70">&lt;{m.fromEmail}&gt;</span></div>
-      <div className="mt-4 flex items-center gap-5 border-b border-hair pb-4">
-        <a href={m.gmailUrl} target="_blank" rel="noreferrer" className={textBtn}>Open in Gmail <kbd className="ml-1 text-[10px] text-ash/70">o</kbd></a>
-        <button onClick={onDone} className={textBtn}>{m.handled ? "Undo done" : "Done"} <kbd className="ml-1 text-[10px] text-ash/70">e</kbd></button>
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-b border-hair pb-5">
+        <a href={m.gmailUrl} target="_blank" rel="noreferrer" className={pill}>Open in Gmail <kbd className="text-[10px] text-ash">o</kbd></a>
+        <button onClick={onDone} className={pill}>{m.handled ? "Undo done" : "Done"} <kbd className="text-[10px] text-ash">e</kbd></button>
         <DropdownMenu>
-          <DropdownMenuTrigger className={cn(textBtn, "inline-flex items-center gap-1")}>
-            {m.category ? LABEL[m.category] : "Sorting…"} <ChevronDown className="size-3" />
+          <DropdownMenuTrigger className={pill}>
+            {m.category ? LABEL[m.category] : "Sorting…"} <ChevronDown className="size-3 text-ash" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             {(Object.keys(LABEL) as Category[]).filter((c) => c !== m.category).map((c) => (
@@ -82,8 +90,8 @@ function Reading({ m, onDone, onMove }: { m: MessageView; onDone: () => void; on
           </DropdownMenuContent>
         </DropdownMenu>
         {m.categoryProbs && (
-          <span className="ml-auto text-[11px] tracking-[0.02em] text-ash">
-            Jev {Object.entries(m.categoryProbs).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, p]) => `${LABEL[k as Category]} ${Math.round(p * 100)}%`).join(" · ")}
+          <span className="ml-auto text-[11px] text-ash">
+            Jev · {Object.entries(m.categoryProbs).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, p]) => `${LABEL[k as Category]} ${Math.round(p * 100)}%`).join(" · ")}
             {m.corrected && " · corrected"}
           </span>
         )}
@@ -149,36 +157,42 @@ export default function MessageList({ items, query, selectedId, onSelect, onDone
     return [...map.values()];
   }, [visible]);
 
+  const panel = "min-h-0 min-w-0 rounded-2xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.03)]";
+
   if (visible.length === 0) {
     return (
-      <div className="py-20 text-center">
-        <div className="mx-auto mb-3 h-px w-6 bg-hair-strong" />
+      <div className={cn(panel, "flex flex-1 flex-col items-center justify-center text-center")}>
         <p className="text-[13px] text-ash">{query ? "No matches." : emptyText}</p>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <div ref={listRef} className="min-w-0">
+    <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <ScrollArea ref={listRef} className={cn(panel, "h-full")}>
         {days.map((list) => (
-          <section key={dayKey(list[0].receivedAt)} className="mb-6">
-            <h3 className="mb-1 pl-6 text-[11px] font-semibold tracking-[0.04em] text-ash uppercase">{dayLabel(list[0].receivedAt)}</h3>
-            <ul className="space-y-0.5">
+          <section key={dayKey(list[0].receivedAt)}>
+            <h3 className="sticky top-0 z-10 border-b border-hair bg-white/95 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-ash backdrop-blur">{dayLabel(list[0].receivedAt)}</h3>
+            <ul className="divide-y divide-hair">
               {list.map((m) => (
                 <Row key={m.id} m={m} active={m.id === selectedId} unread={!read.has(m.id)} onOpen={() => open(m.id === selectedId ? null : m.id)} onDone={() => onDone(m)} />
               ))}
             </ul>
           </section>
         ))}
-      </div>
-      <div className={cn("min-w-0 lg:sticky lg:top-6 lg:self-start", !selected && "max-lg:hidden")}>
-        {selected ? (
-          <Reading m={selected} onDone={() => onDone(selected)} onMove={(c) => onMove(selected, c)} />
-        ) : (
-          <div className="hidden h-40 items-center justify-center text-[12px] text-ash lg:flex">Select a message · j k to move</div>
-        )}
-      </div>
+      </ScrollArea>
+      <ScrollArea className={cn(panel, "h-full", !selected && "max-lg:hidden")}>
+        <div className="min-h-full p-6">
+          {selected ? (
+            <Reading m={selected} onDone={() => onDone(selected)} onMove={(c) => onMove(selected, c)} />
+          ) : (
+            <div className="hidden h-full flex-col items-center justify-center gap-2 text-center lg:flex">
+              <span className="text-[13px] text-ash">No message selected</span>
+              <span className="text-[11px] text-ash/70">j and k to move, enter to open</span>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 }

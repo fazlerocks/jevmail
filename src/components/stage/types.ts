@@ -24,7 +24,7 @@ export type StageStats = {
 /** Everything the stage needs from the outside world. The app passes fetch calls; the preview passes a simulator. */
 export type StageApi = {
   load: (showDone: boolean) => Promise<{ items: MessageView[]; stats: StageStats }>;
-  sync: () => Promise<{ ok: boolean; error?: string; fetched?: number }>;
+  sync: (older?: boolean) => Promise<{ ok: boolean; error?: string; fetched?: number }>;
   feedback: (id: string, kind: FeedbackKind, value?: string) => Promise<void>;
 };
 
@@ -36,8 +36,8 @@ export const apiClient: StageApi = {
     ]);
     return { items: m.items ?? [], stats: s };
   },
-  async sync() {
-    const r = await fetch("/api/sync", { method: "POST" });
+  async sync(older = false) {
+    const r = await fetch(older ? "/api/sync?older=1" : "/api/sync", { method: "POST" });
     const d = await r.json();
     return r.ok ? { ok: true, fetched: d.fetched } : { ok: false, error: d.error ?? String(r.status) };
   },

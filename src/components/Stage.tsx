@@ -26,12 +26,11 @@ const store = {
 type Flight = { key: number; id: string; name: string; subject: string; from: Point; gate?: Point; to: Point; trackY: number; category: Category; text: string };
 type Toast = { text: string; undo?: () => void };
 
-export default function Stage({ email, signOut, api = apiClient }: { email: string; signOut: React.ReactNode; api?: StageApi }) {
+export default function Stage({ email, avatar, signOut, api = apiClient }: { email: string; avatar?: string | null; signOut: React.ReactNode; api?: StageApi }) {
   const [items, setItems] = useState<MessageView[]>([]);
   const [stats, setStats] = useState<(StageStats & { receivedAt: number }) | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [showDone, setShowDone] = useState(false);
-  const [selected, setSelected] = useState<Category | "all">("needs_reply");
+  const [selected, setSelected] = useState<Category | "all" | "done">("needs_reply");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [syncing, setSyncing] = useState(false);
@@ -61,13 +60,11 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   useEffect(() => {
     const t = setTimeout(() => {
       const c = store.get("jevmail:selected", "needs_reply");
-      if (c === "all" || (CATEGORY_ORDER as string[]).includes(c)) setSelected(c as Category | "all");
-      setShowDone(store.get("jevmail:showDone", "0") === "1");
+      if (c === "all" || c === "done" || (CATEGORY_ORDER as string[]).includes(c)) setSelected(c as Category | "all" | "done");
     }, 0);
     return () => clearTimeout(t);
   }, []);
   useEffect(() => { store.set("jevmail:selected", selected); }, [selected]);
-  useEffect(() => { store.set("jevmail:showDone", showDone ? "1" : "0"); }, [showDone]);
 
   const say = useCallback((t: Toast | null, ms = 5000) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -129,7 +126,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
     if (inFlight.current) return;
     inFlight.current = true;
     try {
-      const { items: next, stats: s } = await api.load(showDone);
+      const { items: next, stats: s } = await api.load(true);
       const fresh = [...(s.drain.run.recent ?? [])].reverse().filter((d) => !seen.current.has(d.id));
       for (const d of fresh) {
         seen.current.add(d.id);
@@ -151,7 +148,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
     } finally {
       inFlight.current = false;
     }
-  }, [api, showDone, pump, say]);
+  }, [api, pump, say]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -172,14 +169,14 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
     return () => clearInterval(id);
   }, [load, live]);
 
-  const sync = useCallback(async () => {
+  const sync = useCallback(async (older = false) => {
     if (syncing) return;
     setSyncing(true);
     const poll = setInterval(load, 400);
     try {
-      const r = await api.sync();
+      const r = await api.sync(older);
       if (!r.ok) say({ text: `Sync failed: ${r.error}` });
-      else if (r.fetched === 0) say({ text: "Up to date" }, 2500);
+      else if (r.fetched === 0) say({ text: older ? "No older emails" : "Up to date" }, 2500);
       await load();
     } finally {
       clearInterval(poll);
@@ -211,12 +208,32 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   const move = (m: MessageView, c: Category) => { if (c !== m.category) feedback(m, "corrected_category", c); };
 
   const byCat = useMemo(() => {
-    const map: Record<string, MessageView[]> = { all: [] };
+    const map: Record<string, MessageView[]> = { all: [], done: [] };
     for (const c of CATEGORY_ORDER) map[c] = [];
-    for (const it of items) if (it.category && (showDone || !it.handled)) { map[it.category].push(it); map.all.push(it); }
+    for (const it of items) {
+      if (!it.category) continue;
+      if (it.handled) map.done.push(it);
+      else { map[it.category].push(it); map.all.push(it); }
+    }
     return map;
-  }, [items, showDone]);
-  const selectedLabel = selected === "all" ? "All" : LABEL[selected];
+  }, [items]);
+  const selectedLabel = selected === "all" ? "All" : selected === "done" ? "Done" : LABEL[selected];
+
+  const markAllDone = () => {
+    const list = byCat[selected].filter((m) => !m.handled);
+    if (!list.length) return;
+    setItems((cur) => cur.map((x) => (list.some((m) => m.id === x.id) ? { ...x, handled: true } : x)));
+    setSelectedId(null);
+    Promise.all(list.map((m) => api.feedback(m.id, "handled"))).then(load);
+    say({
+      text: `${list.length.toLocaleString()} marked done`,
+      undo: () => {
+        setItems((cur) => cur.map((x) => (list.some((m) => m.id === x.id) ? { ...x, handled: false } : x)));
+        Promise.all(list.map((m) => api.feedback(m.id, "unhandled"))).then(load);
+        say(null);
+      },
+    }, 8000);
+  };
 
   const pending = stats?.lanes.pending ?? 0;
   const compact = !expanded;
@@ -254,18 +271,33 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
     mode = "idle";
     fraction = 1;
     label = <>Gmail inbox · {items.length.toLocaleString()} emails</>;
-    right = stats?.lastSyncedAt ? <>Synced {ago(stats.lastSyncedAt)} · <button onClick={sync} className="underline decoration-hair-strong underline-offset-4 hover:text-ink">Sync now</button></> : "";
+    right = (
+      <>
+        {stats?.lastSyncedAt && <>Synced {ago(stats.lastSyncedAt)} · </>}
+        <button onClick={() => sync(false)} className="text-shu hover:underline">Sync new</button>
+        {" · "}
+        <button onClick={() => sync(true)} className="text-shu hover:underline">Fetch more</button>
+      </>
+    );
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1040px] px-6">
-      <header className="relative flex items-center justify-center py-8">
-        <span className="text-[22px] font-semibold tracking-tight text-ink" title={email}>Jevmail</span>
-        <div className="absolute right-0 top-1/2 -translate-y-1/2">{signOut}</div>
+    <div className="mx-auto flex h-screen w-full max-w-[1040px] flex-col overflow-hidden px-6">
+      <header className="flex shrink-0 items-center justify-between py-5">
+        <span className="text-[22px] font-semibold tracking-tight text-ink">Jevmail</span>
+        <div className="flex items-center gap-3">
+          {avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={avatar} alt="" title={email} referrerPolicy="no-referrer" className="size-7 rounded-full shadow-[0_1px_2px_rgba(0,0,0,0.12)]" />
+          ) : (
+            <span title={email} className="grid size-7 place-items-center rounded-full bg-hair-strong text-[12px] font-medium text-ink">{(email[0] ?? "?").toUpperCase()}</span>
+          )}
+          {signOut}
+        </div>
       </header>
 
-      {/* the stage: the inbox bar on top, five sorted stacks below */}
-      <div ref={stageRef} className="relative mt-2">
+      {/* the stage: the inbox bar on top, the trays below */}
+      <div ref={stageRef} className="relative shrink-0">
         <ProgressBar
           ref={sourceRef}
           gateRef={jevRef}
@@ -278,7 +310,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
           scanning={flights.some((f) => f.gate)}
           onLaneSettled={() => setTrackReady(expanded && mode !== "fetching")}
         />
-        <div className="mt-12 grid grid-cols-6 items-end gap-4 max-md:grid-cols-3 max-md:gap-y-10">
+        <div className="mt-8 grid grid-cols-7 items-end gap-4 max-md:grid-cols-4 max-md:gap-y-6">
           <Column
             label="All"
             tone="#48484a"
@@ -300,6 +332,14 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
               onClick={() => { setSelected(c); setSelectedId(null); }}
             />
           ))}
+          <Column
+            label="Done"
+            tone="#30b0c7"
+            count={byCat.done.length}
+            selected={selected === "done"}
+            compact={compact}
+            onClick={() => { setSelected("done"); setSelectedId(null); }}
+          />
         </div>
         {flights.map((f) => (
           <Preview key={f.key} from={f.from} gate={f.gate} trackY={f.trackY} to={f.to} name={f.name} subject={f.subject}
@@ -309,12 +349,17 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
         {flights.length === 0 && decision && <ClearDecision onClear={() => setDecision(null)} />}
       </div>
 
-      {/* the mail */}
-      <section className="mt-14">
-        <div className="mb-4 flex items-baseline justify-between gap-6">
-          <h2 className="text-[15px] font-semibold text-ink">
-            {selectedLabel} <span className="ml-1 text-[12px] font-normal tabular-nums text-ash">{byCat[selected].length}</span>
-          </h2>
+      {/* the mail: fills what is left of the viewport and scrolls inside */}
+      <section className="mt-8 flex min-h-0 flex-1 flex-col">
+        <div className="mb-3 flex shrink-0 items-baseline justify-between gap-6">
+          <div className="flex items-baseline gap-4">
+            <h2 className="text-[15px] font-semibold text-ink">
+              {selectedLabel} <span className="ml-1 text-[12px] font-normal tabular-nums text-ash">{byCat[selected].length}</span>
+            </h2>
+            {selected !== "done" && byCat[selected].length > 0 && (
+              <button onClick={markAllDone} className="text-[12px] text-shu hover:underline">Mark all done</button>
+            )}
+          </div>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -325,9 +370,9 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
           />
         </div>
         {neverSynced ? (
-          <div className="py-24 text-center">
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
             <p className="text-[13px] text-ash">Your inbox hasn&apos;t been fetched yet.</p>
-            <button onClick={sync} className="mt-6 rounded-full bg-shu px-5 py-2 text-[13px] font-medium text-white shadow-sm transition-opacity hover:opacity-90">
+            <button onClick={() => sync(false)} className="mt-6 rounded-full bg-shu px-5 py-2 text-[13px] font-medium text-white shadow-sm transition-opacity hover:opacity-90">
               Fetch emails
             </button>
             <p className="mt-4 text-[12px] text-ash">Sorting starts as soon as the fetch finishes.</p>
@@ -345,15 +390,12 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
         )}
       </section>
 
-      <footer className="mt-20 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2 border-t border-hair py-6 text-[11px] tracking-[0.02em] text-ash">
+      <footer className="flex shrink-0 flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-hair py-3 text-[11px] tracking-[0.02em] text-ash">
         <span>
           Sorted by Jev
           {stats && stats.classified > 0 && <> · {stats.classified.toLocaleString()} emails · {usd(stats.usd)}</>}
         </span>
-        <span className="flex items-center gap-4">
-          <span><kbd>j</kbd> <kbd>k</kbd> move · <kbd>e</kbd> done · <kbd>o</kbd> open · <kbd>esc</kbd> close</span>
-          <button onClick={() => setShowDone((v) => !v)} className="underline decoration-hair-strong underline-offset-4 hover:text-ink">{showDone ? "Hide done" : "Show done"}</button>
-        </span>
+        <span><kbd>j</kbd> <kbd>k</kbd> move · <kbd>e</kbd> done · <kbd>o</kbd> open · <kbd>esc</kbd> close</span>
       </footer>
 
       <AnimatePresence>

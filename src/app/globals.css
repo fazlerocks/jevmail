@@ -149,5 +149,7 @@
   }
   html {
     @apply font-sans;
+    /* reserve the scrollbar so content never shifts when a list gets shorter */
+    scrollbar-gutter: stable;
   }
 }

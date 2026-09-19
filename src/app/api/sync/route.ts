@@ -8,7 +8,7 @@ import { env } from "@/lib/env";
 const g = globalThis as unknown as { __jevmailSyncLock?: boolean };
 
 /** Pulls new mail, then hands classification to the drainer so the page can watch it happen. */
-export async function POST() {
+export async function POST(request: Request) {
   const { session, response } = await requireSession();
   if (!session) return response;
   if (!env.hasGatewayKey()) return Response.json({ error: "AI_GATEWAY_API_KEY is not set" }, { status: 400 });
@@ -18,7 +18,8 @@ export async function POST() {
   const started = Date.now();
   try {
     const gmail = gmailClient(session.accessToken!);
-    const result = await fetchNewMessages(gmail, db);
+    const older = new URL(request.url).searchParams.get("older") === "1";
+    const result = await fetchNewMessages(gmail, db, older);
     const pending = unclassifiedMessages(db).length;
     console.log(`[sync] fetched ${result.inserted.length}, ${pending} pending${result.remaining ? `, ${result.remaining} more to pull` : ""}`);
     kickDrain();

@@ -30,7 +30,10 @@ const ProgressBar = forwardRef<HTMLDivElement, {
   return (
     <div>
       <div className="flex items-baseline justify-between gap-6 text-[13px]">
-        <span className="flex items-center gap-2 whitespace-nowrap font-medium text-ink"><GmailMark /> {label}</span>
+        <span className="flex items-center gap-2 whitespace-nowrap">
+          <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-ash">Source</span>
+          <span className="ml-1 flex items-center gap-2 font-medium text-ink"><GmailMark /> {label}</span>
+        </span>
         <span className="whitespace-nowrap text-ash">{right}</span>
       </div>
 
@@ -49,12 +52,12 @@ const ProgressBar = forwardRef<HTMLDivElement, {
       <div className="relative mt-3 h-1.5 w-full rounded-full bg-hair">
         <div ref={startRef} className="absolute left-0 top-1/2 size-0" />
         <motion.div className="absolute left-0 top-0 h-1.5 rounded-full" style={{ background: fillTone }} initial={false} animate={{ width: `${Math.round(Math.max(0, Math.min(1, fraction)) * 1000) / 10}%` }} transition={{ duration: 0.3, ease: "easeOut" }} />
-        {/* the Jev checkpoint at the midpoint */}
-        <div ref={gateRef} className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-ash shadow-sm">
+        {/* the Jev checkpoint at the midpoint, present only while sorting */}
+        <motion.div ref={gateRef} className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-ash shadow-sm" initial={false} animate={{ opacity: mode === "sorting" ? 1 : 0, scale: mode === "sorting" ? 1 : 0.5 }} transition={{ duration: 0.25 }}>
           {scanning && <motion.div className="absolute inset-0 rounded-full bg-shu" animate={{ opacity: [0.2, 1, 0.2] }} transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }} />}
-        </div>
+        </motion.div>
       </div>
-      <div className="mt-2 text-center text-[11px] font-medium text-ash">Jev</div>
+      <motion.div className="mt-2 text-center text-[11px] font-medium text-ash" initial={false} animate={{ opacity: mode === "sorting" ? 1 : 0 }} transition={{ duration: 0.25 }}>Jev</motion.div>
     </div>
   );
 });

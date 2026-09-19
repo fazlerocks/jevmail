@@ -1,4 +1,4 @@
-import { inArray, eq, isNull } from "drizzle-orm";
+import { inArray, eq, isNull, sql } from "drizzle-orm";
 import type { Gmail } from "./client";
 import { parseMessage, type ParsedMessage } from "./parse";
 import { type Db, schema } from "@/db";
@@ -113,6 +113,24 @@ async function currentHistoryId(gmail: Gmail): Promise<string> {
   return String(res.data.historyId);
 }
 
+/** The next `limit` inbox messages older than everything stored. */
+async function listOlderInboxIds(gmail: Gmail, db: Db, limit: number): Promise<string[]> {
+  const oldest = db.select({ t: sql<number>`min(${schema.messages.receivedAt})` }).from(schema.messages).get()?.t;
+  const q = oldest ? `in:inbox before:${Math.floor(oldest / 1000)}` : "in:inbox";
+  const ids: string[] = [];
+  let pageToken: string | undefined;
+  while (ids.length < limit) {
+    const res = await withRetry(
+      () => gmail.users.messages.list({ userId: "me", q, maxResults: Math.min(500, limit - ids.length), pageToken }),
+      "messages.list",
+    );
+    for (const m of res.data.messages ?? []) if (m.id) ids.push(m.id);
+    pageToken = res.data.nextPageToken ?? undefined;
+    if (!pageToken) break;
+  }
+  return ids.slice(0, limit);
+}
+
 /** Thread ids the user has sent mail in recently. One paginated call instead of one call per message. */
 async function sentThreadIds(gmail: Gmail, days: number): Promise<Set<string>> {
   const ids = new Set<string>();
@@ -154,30 +172,35 @@ export type SyncFetchResult = {
   inserted: StoredMessage[];
   /** Candidate messages not fetched this run because of the per-run cap. Sync again to continue. */
   remaining: number;
-  mode: "full" | "incremental";
+  mode: "full" | "incremental" | "older";
 };
 
 /**
  * Pulls new inbox messages into the `messages` table, saving each batch as it
  * lands so a mid-run failure keeps its progress. Does not classify.
  */
-export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchResult> {
+export async function fetchNewMessages(gmail: Gmail, db: Db, older = false): Promise<SyncFetchResult> {
   setProgress({ active: true, phase: "listing", done: 0, total: 0, startedAt: Date.now() });
   throttled = false;
   try {
-    return await fetchNewMessagesInner(gmail, db);
+    return await fetchNewMessagesInner(gmail, db, older);
   } finally {
     setProgress({ active: false, phase: "idle" });
   }
 }
 
-async function fetchNewMessagesInner(gmail: Gmail, db: Db): Promise<SyncFetchResult> {
+async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean): Promise<SyncFetchResult> {
   const state = getSyncState(db);
   let candidateIds: string[];
   let nextHistoryId: string;
   let mode: SyncFetchResult["mode"];
 
-  if (state?.lastHistoryId) {
+  if (older) {
+    // "Fetch more": reach further back. The history bookmark is left untouched.
+    candidateIds = await listOlderInboxIds(gmail, db, env.syncLimit);
+    nextHistoryId = state?.lastHistoryId ?? (await currentHistoryId(gmail));
+    mode = "older";
+  } else if (state?.lastHistoryId) {
     try {
       const r = await listHistoryIds(gmail, state.lastHistoryId);
       candidateIds = r.ids;
@@ -187,7 +210,7 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db): Promise<SyncFetchRes
       if (statusOf(err) === 404) {
         console.warn("[gmail] history id too old, falling back to full sync");
         setSyncState(db, null);
-        return fetchNewMessagesInner(gmail, db);
+        return fetchNewMessagesInner(gmail, db, false);
       }
       throw err;
     }
@@ -252,7 +275,8 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db): Promise<SyncFetchRes
 
   // Only advance the bookmark once every candidate has been pulled; otherwise
   // the next run re-lists and skips what is already stored.
-  if (remaining === 0 && skipped === 0) setSyncState(db, nextHistoryId);
+  if (mode === "older") setSyncState(db, state?.lastHistoryId ?? nextHistoryId);
+  else if (remaining === 0 && skipped === 0) setSyncState(db, nextHistoryId);
   else setSyncState(db, state?.lastHistoryId ?? null);
 
   return { inserted, remaining: remaining + skipped, mode };

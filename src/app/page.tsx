@@ -11,9 +11,10 @@ export default async function Home() {
   if (session.error) redirect("/login?reason=expired");
 
   return (
-    <main className="min-h-screen">
+    <main className="h-screen">
       <Stage
         email={session.user?.email ?? ""}
+        avatar={session.user?.image ?? null}
         signOut={
           <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
             <button className="text-[12px] tracking-[0.04em] text-ash hover:text-ink">Sign out</button>

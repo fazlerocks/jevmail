@@ -34,8 +34,14 @@ export class Simulator implements StageApi {
   private lastSyncedAt: number | null = null;
 
   constructor(private total: number, private rate: number) {
+    this.grow(total);
+  }
+
+  /** Add `n` older messages behind whatever exists. */
+  private grow(n: number) {
+    const start = this.msgs.length;
     const now = Date.now();
-    for (let i = 0; i < total; i++) {
+    for (let i = start; i < start + n; i++) {
       const truth = weightedCategory(((i * 7919) % 1000) / 1000);
       const s = SENDERS.filter((x) => x[2] === truth);
       const [name, email] = pick(s, i);
@@ -68,9 +74,10 @@ export class Simulator implements StageApi {
     return { items, stats };
   }
 
-  async sync() {
+  async sync(older = false) {
     if (this.syncState.active) return { ok: false, error: "already running" };
-    const toFetch = this.msgs.filter((m) => !m.fetched);
+    if (older && !this.msgs.some((m) => !m.fetched)) this.grow(this.total);
+    const toFetch = this.msgs.filter((m) => !m.fetched).slice(0, this.total);
     this.syncState = { active: true, phase: "listing", done: 0, total: toFetch.length, startedAt: Date.now() };
     await new Promise((r) => setTimeout(r, 400));
     this.syncState.phase = "fetching";
