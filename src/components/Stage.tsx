@@ -270,7 +270,7 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
     label = <>{pending.toLocaleString()} waiting to sort</>;
     right = run?.rateLimited && stats?.drain.nextInMs != null
       ? `free tier · next ${stats.drain.burst} in ${Math.max(1, Math.round(stats.drain.nextInMs / 60000))} min`
-      : <button onClick={() => api.sort().then(load)} className="rounded-full bg-shu px-3 py-1 text-[12px] font-medium text-white shadow-sm hover:opacity-90">Start sorting</button>;
+      : "";
   } else if (items.length > 0) {
     mode = "idle";
     fraction = 1;
