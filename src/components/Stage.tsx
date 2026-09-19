@@ -57,9 +57,14 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
   const jevRef = useRef<HTMLDivElement>(null);
   const stackRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // remembered preferences, restored after mount so server and first client render agree
+  // remembered preferences, restored after mount so server and first client render agree.
+  // Visiting /?reset=1 forgets them (read marks, selected tray) and drops the flag from the URL.
   useEffect(() => {
     const t = setTimeout(() => {
+      if (new URLSearchParams(window.location.search).get("reset") === "1") {
+        try { for (const k of Object.keys(localStorage)) if (k.startsWith("jevmail:")) localStorage.removeItem(k); } catch {}
+        window.history.replaceState(null, "", window.location.pathname);
+      }
       const c = store.get("jevmail:selected", "needs_reply");
       if (c === "all" || c === "done" || (CATEGORY_ORDER as string[]).includes(c)) setSelected(c as Category | "all" | "done");
     }, 0);
