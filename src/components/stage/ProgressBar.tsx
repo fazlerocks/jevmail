@@ -29,7 +29,7 @@ const ProgressBar = forwardRef<HTMLDivElement, {
   const fillTone = mode === "idle" ? "var(--hair-strong)" : "var(--shu)";
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-6 text-[13px]">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-[13px]">
         <span className="flex items-center gap-2 whitespace-nowrap">
           <span className="text-[11px] font-medium uppercase tracking-[0.06em] text-ash">Source</span>
           <span className="ml-1 flex items-center gap-2 font-medium text-ink"><GmailMark /> {label}</span>

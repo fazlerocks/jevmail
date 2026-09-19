@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Check, ExternalLink, FolderInput, Undo2 } from "lucide-react";
+import { ChevronDown, ChevronLeft, Check, ExternalLink, FolderInput, Undo2 } from "lucide-react";
 import Key from "@/components/Key";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -162,7 +162,7 @@ export default function MessageList({ items, query, selectedId, onSelect, onDone
     return [...map.values()];
   }, [visible]);
 
-  const panel = "min-h-0 min-w-0 rounded-2xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.03)]";
+  const panel = "min-h-0 min-w-0 overflow-hidden rounded-2xl bg-white shadow-[0_1px_3px_rgba(0,0,0,0.05),0_0_0_1px_rgba(0,0,0,0.03)]";
 
   if (visible.length === 0) {
     return (
@@ -173,8 +173,8 @@ export default function MessageList({ items, query, selectedId, onSelect, onDone
   }
 
   return (
-    <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <ScrollArea ref={listRef} className={cn(panel, "h-full")}>
+    <div className={cn(panel, "grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]")}>
+      <ScrollArea ref={listRef} className={cn("h-full min-h-0 lg:border-r lg:border-hair", selected && "max-lg:hidden")}>
         {days.map((list) => (
           <section key={dayKey(list[0].receivedAt)}>
             <h3 className="sticky top-0 z-10 border-b border-hair bg-white/95 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.04em] text-ash backdrop-blur">{dayLabel(list[0].receivedAt)}</h3>
@@ -186,10 +186,13 @@ export default function MessageList({ items, query, selectedId, onSelect, onDone
           </section>
         ))}
       </ScrollArea>
-      <ScrollArea className={cn(panel, "h-full", !selected && "max-lg:hidden")}>
-        <div className="min-h-full p-6">
+      <ScrollArea className={cn("h-full min-h-0", !selected && "max-lg:hidden")}>
+        <div className="min-h-full p-7 max-md:p-5">
           {selected ? (
-            <Reading m={selected} onDone={() => onDone(selected)} onMove={(c) => onMove(selected, c)} />
+            <>
+              <button onClick={() => onSelect(null)} className="mb-4 inline-flex items-center gap-1 text-[12.5px] font-medium text-shu lg:hidden"><ChevronLeft className="size-4" /> Back</button>
+              <Reading m={selected} onDone={() => onDone(selected)} onMove={(c) => onMove(selected, c)} />
+            </>
           ) : (
             <div className="hidden h-full flex-col items-center justify-center gap-2 text-center lg:flex">
               <span className="text-[13px] text-ash">No message selected</span>

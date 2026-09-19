@@ -17,7 +17,7 @@ const RELEASE_MS = 320;  // one preview leaves the source at most this often
 const QUEUE_MAX = 12;
 const SETTLE_MS = 1500;  // keep the stage open briefly after the last preview lands
 
-const usd = (n: number) => (n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
+const usd = (n: number) => (n <= 0 ? "$0" : n < 0.01 ? "under a cent" : `$${n.toFixed(2)}`);
 const ago = (ms: number) => { const s = (Date.now() - ms) / 1000; return s < 60 ? "just now" : s < 3600 ? `${Math.floor(s / 60)} min ago` : s < 86400 ? `${Math.floor(s / 3600)} h ago` : `${Math.floor(s / 86400)} d ago`; };
 const store = {
   get: (k: string, d: string) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } },
@@ -165,8 +165,9 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
   }, [busy]);
 
   const live = busy;
+  // Poll fast while work is happening (even if the tab is in the background, runs are short); slowly otherwise.
   useEffect(() => {
-    const id = setInterval(() => { if (document.visibilityState === "visible") load(); }, live ? 300 : 30_000);
+    const id = setInterval(() => { if (live || document.visibilityState === "visible") load(); }, live ? 300 : 30_000);
     return () => clearInterval(id);
   }, [load, live]);
 
@@ -311,7 +312,7 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
           scanning={flights.some((f) => f.gate)}
           onLaneSettled={() => setTrackReady(expanded && mode !== "fetching")}
         />
-        <div className="mt-8 grid grid-cols-7 items-end gap-4 max-md:grid-cols-4 max-md:gap-y-6">
+        <div className="mt-8 grid grid-cols-7 items-end gap-4 max-md:mt-4 max-md:grid-cols-4 max-md:gap-x-2 max-md:gap-y-3">
           <Column
             label="All"
             tone="#48484a"
@@ -351,8 +352,8 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
       </div>
 
       {/* the mail: fills what is left of the viewport and scrolls inside */}
-      <section className="mt-8 flex min-h-0 flex-1 flex-col">
-        <div className="mb-3 flex shrink-0 items-baseline justify-between gap-6">
+      <section className="mt-8 flex min-h-0 flex-1 flex-col overflow-hidden pb-4">
+        <div className="mb-3 flex shrink-0 flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <div className="flex items-baseline gap-4">
             <h2 className="text-[15px] font-semibold text-ink">
               {selectedLabel} <span className="ml-1 text-[12px] font-normal tabular-nums text-ash">{byCat[selected].length}</span>
@@ -367,7 +368,7 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
             onKeyDown={(e) => { if (e.key === "Escape") { setQuery(""); (e.target as HTMLInputElement).blur(); } }}
             placeholder="Search"
             aria-label="Search"
-            className="w-52 rounded-lg bg-white px-3 py-1.5 text-[13px] text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] placeholder:text-ash focus:outline-none focus:ring-2 focus:ring-shu/30"
+            className="w-52 rounded-lg bg-white px-3 py-1.5 text-[13px] text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] placeholder:text-ash focus:outline-none focus:ring-2 focus:ring-shu/30 max-md:w-full"
           />
         </div>
         {neverSynced ? (
@@ -396,7 +397,7 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
           Sorted by Jev
           {stats && stats.classified > 0 && <> · {stats.classified.toLocaleString()} emails · {usd(stats.usd)}</>}
         </span>
-        <span className="flex items-center gap-3">
+        <span className="flex items-center gap-3 max-md:hidden">
           <span className="flex items-center gap-1"><Key>j</Key><Key>k</Key> move</span>
           <span className="flex items-center gap-1"><Key>e</Key> done</span>
           <span className="flex items-center gap-1"><Key>o</Key> open</span>

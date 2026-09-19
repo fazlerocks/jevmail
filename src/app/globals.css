@@ -149,9 +149,9 @@
 }
 [data-slot="scroll-area-scrollbar"] {
   position: absolute;
-  top: 6px;
-  bottom: 6px;
-  right: 3px;
+  top: 14px;     /* clear the panel's corner radius */
+  bottom: 14px;
+  right: 4px;
 }
 
 @layer base {
