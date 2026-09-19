@@ -31,7 +31,7 @@ export type StageApi = {
 export const apiClient: StageApi = {
   async load(showDone) {
     const [m, s] = await Promise.all([
-      fetch(`/api/messages?lane=all&includeHandled=${showDone}&limit=1200`).then((r) => r.json()),
+      fetch(`/api/messages?lane=all&includeHandled=${showDone}&limit=10000`).then((r) => r.json()),
       fetch("/api/stats").then((r) => r.json()),
     ]);
     return { items: m.items ?? [], stats: s };

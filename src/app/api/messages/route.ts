@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     : "needs_reply";
   const includeHandled = url.searchParams.get("includeHandled") === "true";
   const offset = Math.max(0, Number(url.searchParams.get("cursor") ?? 0) || 0);
-  const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
+  // The client filters and groups locally, so it asks for everything; cap generously.
+  const limit = Math.min(10_000, Math.max(1, Number(url.searchParams.get("limit") ?? 50) || 50));
   return Response.json(listMessages({ lane, includeHandled, offset, limit }));
 }
