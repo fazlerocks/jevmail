@@ -48,9 +48,9 @@ export const apiClient: StageApi = {
 
 export const CATEGORY_ORDER: Category[] = ["needs_reply", "updates", "promotional", "sales", "spam"];
 export const TONE: Record<Category, string> = {
-  needs_reply: "var(--shu)",
-  updates: "var(--persimmon)",
-  promotional: "var(--matcha)",
-  sales: "var(--wisteria)",
-  spam: "var(--stone)",
+  needs_reply: "#0a84ff",
+  updates: "#ff9f0a",
+  promotional: "#34c759",
+  sales: "#af52de",
+  spam: "#8e8e93",
 };

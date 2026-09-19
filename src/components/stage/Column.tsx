@@ -1,27 +1,26 @@
 "use client";
 
 import { forwardRef } from "react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
-import Stack, { MAX_LINES } from "./Stack";
+import BoxIcon from "./BoxIcon";
 
-export const COMPACT_LINES = 12;
-
-/** A category on the shelf: count, paper stack, shelf line, label. Compact between syncs. */
+/** A category as a tray: count above, the box, label below. The ref marks the box opening. */
 const Column = forwardRef<HTMLDivElement, {
   label: string; tone: string; count: number; selected: boolean; emphasized?: boolean; compact: boolean; onClick: () => void;
 }>(function Column({ label, tone, count, selected, emphasized, compact, onClick }, ref) {
+  const size = compact ? 72 : 104;
   return (
-    <button onClick={onClick} className={cn("group flex w-full flex-col items-start text-left", !selected && "hover:opacity-80")}>
-      <div className={cn("font-light tabular-nums text-ink transition-all duration-300", compact ? "h-[24px] text-[22px] leading-none" : emphasized ? "h-[52px] text-[52px] leading-none" : "h-[52px] pt-2 text-[44px] leading-none")}>
+    <button onClick={onClick} className="group flex w-full flex-col items-center gap-2 text-center">
+      <div className={cn("tabular-nums text-ink transition-all duration-300", compact ? "text-[20px] font-medium leading-none" : emphasized ? "text-[36px] font-semibold leading-none" : "text-[32px] font-medium leading-none")}>
         {count.toLocaleString()}
       </div>
-      <div className="mt-3 w-full border-b border-hair-strong">
-        <Stack ref={ref} count={count} tone={tone} maxLines={compact ? COMPACT_LINES : MAX_LINES} />
-      </div>
-      <div className={cn("mt-2.5 flex items-center gap-2 text-[12px] tracking-[0.02em]", selected ? "text-ink" : "text-ash")}>
-        <span className="size-1.5 rounded-full" style={{ background: tone }} />
-        <span className={cn(selected && "underline underline-offset-4 decoration-hair-strong")}>{label}</span>
-      </div>
+      <motion.div key={count} className="relative transition-transform duration-200 group-hover:-translate-y-0.5" initial={{ scale: count ? 1.04 : 1 }} animate={{ scale: 1 }} transition={{ duration: 0.25 }}>
+        <BoxIcon tone={tone} sheets={count} size={size} selected={selected} />
+        {/* the opening: where mail lands */}
+        <div ref={ref} className="absolute left-1/2 size-0" style={{ top: size * 0.2 }} />
+      </motion.div>
+      <div className={cn("text-[12px]", selected ? "font-medium text-ink" : "text-ash")}>{label}</div>
     </button>
   );
 });

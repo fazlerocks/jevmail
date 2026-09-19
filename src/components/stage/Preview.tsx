@@ -25,7 +25,7 @@ export default function Preview({ from, gate, trackY, to, name, subject, onGate,
   const duration = withGate ? 1.4 : 0.5;
   return (
     <motion.div
-      className="pointer-events-none absolute left-0 top-0 z-20 overflow-hidden border border-hair-strong bg-paper"
+      className="pointer-events-none absolute left-0 top-0 z-20 overflow-hidden rounded-lg bg-white shadow-[0_2px_8px_rgba(0,0,0,0.10)]"
       style={{ marginLeft: -CARD_W / 2, marginTop: -CARD_H / 2, transformOrigin: "center" }}
       initial={{ x: from.x, y: from.y, width: SHEET_W, height: 2, opacity: 0 }}
       animate={{ x: xs, y: ys, width: ws, height: hs, opacity: withGate ? [0, 1, 1, 1, 0.5] : [0.6, 0.2] }}
@@ -34,7 +34,7 @@ export default function Preview({ from, gate, trackY, to, name, subject, onGate,
       onAnimationComplete={onDone}
     >
       <motion.div className="flex h-full flex-col justify-center px-3" animate={{ opacity: textOp }} transition={{ duration, times }}>
-        <div className="truncate text-[11px] leading-tight text-ink">{name}</div>
+        <div className="truncate text-[11px] font-medium leading-tight text-ink">{name}</div>
         <div className="truncate text-[11px] leading-tight text-ash">{subject || "(no subject)"}</div>
       </motion.div>
     </motion.div>

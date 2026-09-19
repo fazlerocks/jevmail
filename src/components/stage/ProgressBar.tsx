@@ -26,11 +26,11 @@ const ProgressBar = forwardRef<HTMLDivElement, {
   gateRef: React.Ref<HTMLDivElement>;
   onLaneSettled: () => void;
 }>(function ProgressBar({ mode, label, right, fraction, laneOpen, decision, scanning, gateRef, onLaneSettled }, startRef) {
-  const fillTone = mode === "sorting" ? "var(--ink)" : mode === "fetching" ? "var(--ink)" : "var(--hair-strong)";
+  const fillTone = mode === "idle" ? "var(--hair-strong)" : "var(--shu)";
   return (
     <div>
-      <div className="flex items-baseline justify-between gap-6 text-[12px] tracking-[0.02em]">
-        <span className="flex items-center gap-2 whitespace-nowrap text-ink"><GmailMark /> {label}</span>
+      <div className="flex items-baseline justify-between gap-6 text-[13px]">
+        <span className="flex items-center gap-2 whitespace-nowrap font-medium text-ink"><GmailMark /> {label}</span>
         <span className="whitespace-nowrap text-ash">{right}</span>
       </div>
 
@@ -46,15 +46,15 @@ const ProgressBar = forwardRef<HTMLDivElement, {
       </motion.div>
 
       {/* the bar */}
-      <div className="relative mt-3 h-px w-full bg-hair">
-        <div ref={startRef} className="absolute left-0 top-0 size-0" />
-        <motion.div className="absolute left-0 top-0 h-px" style={{ background: fillTone }} initial={false} animate={{ width: `${Math.round(Math.max(0, Math.min(1, fraction)) * 1000) / 10}%` }} transition={{ duration: 0.3, ease: "easeOut" }} />
-        {/* the Jev tick at the midpoint */}
-        <div ref={gateRef} className="absolute left-1/2 top-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-hair-strong">
-          {scanning && <motion.div className="absolute left-0 top-0 w-px bg-shu" animate={{ height: ["0%", "100%", "0%"] }} transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }} />}
+      <div className="relative mt-3 h-1.5 w-full rounded-full bg-hair">
+        <div ref={startRef} className="absolute left-0 top-1/2 size-0" />
+        <motion.div className="absolute left-0 top-0 h-1.5 rounded-full" style={{ background: fillTone }} initial={false} animate={{ width: `${Math.round(Math.max(0, Math.min(1, fraction)) * 1000) / 10}%` }} transition={{ duration: 0.3, ease: "easeOut" }} />
+        {/* the Jev checkpoint at the midpoint */}
+        <div ref={gateRef} className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-ash shadow-sm">
+          {scanning && <motion.div className="absolute inset-0 rounded-full bg-shu" animate={{ opacity: [0.2, 1, 0.2] }} transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }} />}
         </div>
       </div>
-      <div className="mt-2 text-center text-[11px] tracking-[0.04em] text-ash">Jev</div>
+      <div className="mt-2 text-center text-[11px] font-medium text-ash">Jev</div>
     </div>
   );
 });

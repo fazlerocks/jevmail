@@ -259,7 +259,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   return (
     <div className="mx-auto w-full max-w-[1040px] px-6">
       <header className="relative flex items-center justify-center py-8">
-        <span className="text-[24px] font-light tracking-[0.08em] text-ink" title={email}>Jevmail</span>
+        <span className="text-[22px] font-semibold tracking-tight text-ink" title={email}>Jevmail</span>
         <div className="absolute right-0 top-1/2 -translate-y-1/2">{signOut}</div>
       </header>
 
@@ -277,7 +277,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
           scanning={flights.some((f) => f.gate)}
           onLaneSettled={() => setTrackReady(expanded && mode !== "fetching")}
         />
-        <div className="mt-10 grid grid-cols-5 items-end max-md:grid-cols-3 max-md:gap-y-10">
+        <div className="mt-12 grid grid-cols-5 items-end gap-4 max-md:grid-cols-3 max-md:gap-y-10">
           {CATEGORY_ORDER.map((c) => (
             <Column
               key={c}
@@ -303,8 +303,8 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
       {/* the mail */}
       <section className="mt-14">
         <div className="mb-4 flex items-baseline justify-between gap-6">
-          <h2 className="text-[14px] text-ink">
-            {LABEL[selected]} <span className="ml-1 text-[12px] tabular-nums text-ash">{byCat[selected].length}</span>
+          <h2 className="text-[15px] font-semibold text-ink">
+            {LABEL[selected]} <span className="ml-1 text-[12px] font-normal tabular-nums text-ash">{byCat[selected].length}</span>
           </h2>
           <input
             value={query}
@@ -312,13 +312,13 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
             onKeyDown={(e) => { if (e.key === "Escape") { setQuery(""); (e.target as HTMLInputElement).blur(); } }}
             placeholder="Search"
             aria-label="Search"
-            className="w-48 border-b border-hair bg-transparent py-1 text-[13px] text-ink placeholder:text-ash focus:border-hair-strong focus:outline-none"
+            className="w-52 rounded-lg bg-white px-3 py-1.5 text-[13px] text-ink shadow-[0_1px_2px_rgba(0,0,0,0.06)] placeholder:text-ash focus:outline-none focus:ring-2 focus:ring-shu/30"
           />
         </div>
         {neverSynced ? (
           <div className="py-24 text-center">
             <p className="text-[13px] text-ash">Your inbox hasn&apos;t been fetched yet.</p>
-            <button onClick={sync} className="mt-6 border border-ink px-5 py-2 text-[13px] text-ink transition-colors hover:bg-ink hover:text-paper">
+            <button onClick={sync} className="mt-6 rounded-full bg-shu px-5 py-2 text-[13px] font-medium text-white shadow-sm transition-opacity hover:opacity-90">
               Fetch emails
             </button>
             <p className="mt-4 text-[12px] text-ash">Sorting starts as soon as the fetch finishes.</p>
@@ -349,7 +349,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
 
       <AnimatePresence>
         {toast && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cn("fixed bottom-8 left-1/2 z-30 flex -translate-x-1/2 items-center gap-4 border border-hair-strong bg-paper px-4 py-2 text-[13px] text-ink")}>
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={cn("fixed bottom-8 left-1/2 z-30 flex -translate-x-1/2 items-center gap-4 rounded-full bg-white px-4 py-2 text-[13px] text-ink shadow-[0_4px_16px_rgba(0,0,0,0.12)]")}>
             {toast.text}
             {toast.undo && <button onClick={toast.undo} className="text-ash underline decoration-hair-strong underline-offset-4 hover:text-ink">Undo</button>}
           </motion.div>

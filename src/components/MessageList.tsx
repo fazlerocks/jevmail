@@ -45,13 +45,12 @@ function Row({ m, active, unread, onOpen, onDone }: {
     <li
       data-row={m.id}
       onClick={onOpen}
-      className={cn("group relative flex cursor-pointer items-baseline gap-3 border-b border-hair py-3 pl-6 pr-2", active && "bg-white/70")}
+      className={cn("group relative flex cursor-pointer items-baseline gap-3 rounded-xl py-3 pl-6 pr-3 transition-colors", active ? "bg-white shadow-[0_1px_3px_rgba(0,0,0,0.06)]" : "hover:bg-white/60")}
     >
-      {active && <span className="absolute inset-y-0 left-0 w-px bg-ink" />}
-      <span className={cn("absolute left-2.5 top-1/2 size-1.5 -translate-y-1/2 rounded-full", unread ? "bg-ink" : "bg-transparent")} />
+      <span className={cn("absolute left-2.5 top-1/2 size-2 -translate-y-1/2 rounded-full", unread ? "bg-shu" : "bg-transparent")} />
       <span className={cn("w-36 shrink-0 truncate text-[13.5px]", unread ? "text-ink" : "text-ink/80")}>{m.fromName || m.fromEmail}</span>
       <span className="min-w-0 flex-1 truncate text-[13.5px]">
-        {urgent && <span className="mr-2 inline-block h-px w-3 -translate-y-1 bg-shu align-middle" title="Urgent" />}
+        {urgent && <span className="mr-1.5 inline-block size-1.5 -translate-y-px rounded-full bg-persimmon align-middle" title="Urgent" />}
         <span className={cn(unread ? "text-ink" : "text-ink/80")}>{m.subject || "(no subject)"}</span>
         <span className="text-ash"> — {m.snippet.slice(0, 120)}</span>
       </span>
@@ -65,7 +64,7 @@ function Reading({ m, onDone, onMove }: { m: MessageView; onDone: () => void; on
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-[16px] text-ink">{m.subject || "(no subject)"}</h2>
+        <h2 className="text-[17px] font-semibold text-ink">{m.subject || "(no subject)"}</h2>
         <span className="shrink-0 text-[12px] tabular-nums text-ash">{new Date(m.receivedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
       </div>
       <div className="mt-1 text-[12px] text-ash">{m.fromName} <span className="opacity-70">&lt;{m.fromEmail}&gt;</span></div>
@@ -164,8 +163,8 @@ export default function MessageList({ items, query, selectedId, onSelect, onDone
       <div ref={listRef} className="min-w-0">
         {days.map((list) => (
           <section key={dayKey(list[0].receivedAt)} className="mb-6">
-            <h3 className="mb-1 pl-6 text-[11px] tracking-[0.06em] text-ash uppercase">{dayLabel(list[0].receivedAt)}</h3>
-            <ul className="border-t border-hair">
+            <h3 className="mb-1 pl-6 text-[11px] font-semibold tracking-[0.04em] text-ash uppercase">{dayLabel(list[0].receivedAt)}</h3>
+            <ul className="space-y-0.5">
               {list.map((m) => (
                 <Row key={m.id} m={m} active={m.id === selectedId} unread={!read.has(m.id)} onOpen={() => open(m.id === selectedId ? null : m.id)} onDone={() => onDone(m)} />
               ))}
