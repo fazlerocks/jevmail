@@ -30,7 +30,8 @@ export async function POST() {
     remaining = result.remaining;
 
     // Retry anything stored earlier that still lacks a classification, then the new ones.
-    const toClassify = [...unclassifiedMessages(db).filter((m) => !result.inserted.some((n) => n.id === m.id)), ...result.inserted];
+    // Newest first, capped to one free-tier burst; the background drainer works through the rest.
+    const toClassify = [...result.inserted, ...unclassifiedMessages(db).filter((m) => !result.inserted.some((n) => n.id === m.id))].slice(0, env.jevBurst);
 
     let last = 0;
     for (const m of toClassify) {
@@ -60,6 +61,7 @@ export async function POST() {
       fetched,
       classified,
       failed: failed + (gatewayError ? Math.max(0, toClassify.length - classified - failed) : 0),
+      pending: unclassifiedMessages(db).length,
       remaining,
       durationMs: Date.now() - started,
       error: gatewayError,

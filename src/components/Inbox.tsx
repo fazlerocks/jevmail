@@ -24,6 +24,15 @@ type Stats = {
   corrected: number;
   agreement: number;
   lastSyncedAt: number | null;
+  drain: {
+    running: boolean;
+    inTick: boolean;
+    nextTickAt: number | null;
+    nextInMs: number | null;
+    lastResult: { classified: number; rateLimited: boolean; error: string | null } | null;
+    burst: number;
+    intervalMs: number;
+  };
 };
 
 function timeAgo(ms: number) {
@@ -80,8 +89,9 @@ export default function Inbox() {
       else if (d.error) setToast(`Fetched ${d.fetched}, classified ${d.classified}. Gateway: ${d.error}`);
       else
         setToast(
-          `Fetched ${d.fetched}, classified ${d.classified}${d.failed ? `, ${d.failed} pending` : ""} in ${(d.durationMs / 1000).toFixed(1)}s` +
-            (d.remaining ? `. ${d.remaining} more to pull, click Sync again.` : ""),
+          `Fetched ${d.fetched}, classified ${d.classified} in ${(d.durationMs / 1000).toFixed(1)}s` +
+            (d.pending ? `. ${d.pending} pending, classifying in the background.` : "") +
+            (d.remaining ? ` ${d.remaining} more to pull, click Sync again.` : ""),
         );
       await load();
     } catch (e) {
@@ -91,6 +101,16 @@ export default function Inbox() {
       setTimeout(() => setToast(null), 6000);
     }
   }, [syncing, load]);
+
+  // Keep stats fresh while the background drainer works through Pending.
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/stats").then((r) => r.json()).then(setStats);
+      if (lane === "pending" || lane === "needs_reply") load();
+    }, 30 * 1000);
+    return () => clearInterval(id);
+  }, [lane, load]);
 
   // Optional auto-sync every 5 minutes while the tab is open.
   useEffect(() => {
@@ -129,6 +149,12 @@ export default function Inbox() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-zinc-500">
           {stats?.lastSyncedAt ? `Last synced ${timeAgo(stats.lastSyncedAt)}` : "Not synced yet"}
+          {stats && stats.lanes.pending > 0 && stats.drain.running && (
+            <span className="ml-2">
+              · {stats.drain.inTick ? "Classifying…" : `Next ${stats.drain.burst} in ${Math.max(1, Math.round((stats.drain.nextInMs ?? 0) / 60000))} min`}
+              {stats.drain.lastResult?.rateLimited && " (free tier limit)"}
+            </span>
+          )}
         </div>
         <button
           onClick={sync}

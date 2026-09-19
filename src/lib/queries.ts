@@ -1,6 +1,8 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { CATEGORIES, type Category, type FeedbackKind } from "@/db/schema";
+import { drainState } from "@/lib/drainer";
+import { env } from "@/lib/env";
 
 export type Lane = Category | "pending" | "all";
 
@@ -111,5 +113,15 @@ export function stats() {
   const agreement = classified === 0 ? 1 : (classified - corrected) / classified;
 
   const st = db.select().from(schema.syncState).where(eq(schema.syncState.id, 1)).get();
-  return { lanes, classified, corrected, agreement, lastSyncedAt: st?.lastSyncedAt ?? null };
+  return {
+    lanes,
+    classified,
+    corrected,
+    agreement,
+    lastSyncedAt: st?.lastSyncedAt ?? null,
+    drain: (() => {
+      const d = drainState();
+      return { ...d, nextInMs: d.nextTickAt ? Math.max(0, d.nextTickAt - Date.now()) : null, burst: env.jevBurst, intervalMs: env.jevDrainIntervalMs };
+    })(),
+  };
 }
