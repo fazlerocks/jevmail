@@ -25,6 +25,7 @@ export type StageStats = {
 export type StageApi = {
   load: (showDone: boolean) => Promise<{ items: MessageView[]; stats: StageStats }>;
   sync: (older?: boolean) => Promise<{ ok: boolean; error?: string; fetched?: number }>;
+  sort: () => Promise<void>;
   feedback: (id: string, kind: FeedbackKind, value?: string) => Promise<void>;
 };
 
@@ -40,6 +41,9 @@ export const apiClient: StageApi = {
     const r = await fetch(older ? "/api/sync?older=1" : "/api/sync", { method: "POST" });
     const d = await r.json();
     return r.ok ? { ok: true, fetched: d.fetched } : { ok: false, error: d.error ?? String(r.status) };
+  },
+  async sort() {
+    await fetch("/api/sort", { method: "POST" });
   },
   async feedback(id, kind, value) {
     await fetch(`/api/messages/${id}/feedback`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, value }) });

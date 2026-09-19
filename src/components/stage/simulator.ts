@@ -114,6 +114,10 @@ export class Simulator implements StageApi {
     }, 1000 / this.rate);
   }
 
+  async sort() {
+    this.startRun();
+  }
+
   async feedback(id: string, kind: FeedbackKind, value?: string) {
     const m = this.msgs.find((x) => x.id === id);
     if (!m) return;

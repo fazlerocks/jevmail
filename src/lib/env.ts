@@ -25,6 +25,8 @@ export const env = {
   jevConcurrency: Math.max(1, Number(process.env.JEV_CONCURRENCY ?? 1)),
   /** Jev list price, USD per input token, for the live cost meter. */
   jevUsdPerInputToken: 0.042 / 1_000_000,
+  /** When "0", the timer never starts a run on its own; sorting begins from a fetch chunk or the Start sorting button. */
+  jevAutoSort: process.env.JEV_AUTO_SORT !== "0",
   /** Background drain tick. Measured free-tier window is 5 calls per 299 s; 310 s keeps a margin. Set 0 to disable. */
   jevDrainIntervalMs: Number(process.env.JEV_DRAIN_INTERVAL_MS ?? 310_000),
   hasGatewayKey: () => Boolean(process.env.AI_GATEWAY_API_KEY),

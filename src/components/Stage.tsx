@@ -265,10 +265,12 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
     label = <>Sorting {run.classified.toLocaleString()} of {run.total.toLocaleString()}</>;
     right = run.perSec ? `${run.perSec.toFixed(0)} per second` : "";
   } else if (pending > 0) {
-    mode = "sorting";
+    mode = "idle";
     fraction = items.length ? (items.length - pending) / items.length : 0;
-    label = `${pending.toLocaleString()} waiting to sort`;
-    right = run?.rateLimited && stats?.drain.nextInMs != null ? `next ${stats.drain.burst} in ${Math.max(1, Math.round(stats.drain.nextInMs / 60000))} min` : "";
+    label = <>{pending.toLocaleString()} waiting to sort</>;
+    right = run?.rateLimited && stats?.drain.nextInMs != null
+      ? `free tier · next ${stats.drain.burst} in ${Math.max(1, Math.round(stats.drain.nextInMs / 60000))} min`
+      : <button onClick={() => api.sort().then(load)} className="rounded-full bg-shu px-3 py-1 text-[12px] font-medium text-white shadow-sm hover:opacity-90">Start sorting</button>;
   } else if (items.length > 0) {
     mode = "idle";
     fraction = 1;

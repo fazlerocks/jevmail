@@ -99,10 +99,12 @@ export async function drainOnce(limit = env.jevBurst): Promise<{ classified: num
   return { classified, rateLimited, error };
 }
 
-async function tick() {
+async function tick(auto = false) {
   const d = ensure();
   const { state } = d;
   if (state.inTick) return;
+  // A timer tick may continue a run but only starts one when auto-sort is on.
+  if (auto && !state.run.active && !env.jevAutoSort) return;
   state.inTick = true;
   state.lastTickAt = Date.now();
   try {
@@ -153,7 +155,7 @@ export function startDrainer() {
   if (d.timer || !env.hasGatewayKey() || env.jevDrainIntervalMs <= 0) return;
   d.state.running = true;
   d.state.nextTickAt = Date.now() + env.jevDrainIntervalMs;
-  d.timer = setInterval(() => void tick(), env.jevDrainIntervalMs);
+  d.timer = setInterval(() => void tick(true), env.jevDrainIntervalMs);
   d.timer.unref();
   console.log(`[drain] started: up to ${env.jevBurst} messages every ${Math.round(env.jevDrainIntervalMs / 1000)}s, concurrency ${env.jevConcurrency}`);
 }
