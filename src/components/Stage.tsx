@@ -255,7 +255,10 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
           <JevNode ref={jevRef} decision={decision} scanning={flights.some((f) => f.gate)} height={TRACK_H} />
         </motion.div>
         <div className="grid grid-cols-6 items-end max-md:grid-cols-3 max-md:gap-y-10">
-          <SourceNode ref={sourceRef} pulled={items.length} syncing={syncActive} phase={stats?.sync.phase ?? "idle"} done={stats?.sync.done ?? 0} total={stats?.sync.total ?? 0} compact={compact} />
+          {/* the source stands apart from the five sorted stacks */}
+          <div className="self-end md:mr-10 md:border-r md:border-hair md:pr-6">
+            <SourceNode ref={sourceRef} pulled={items.length} syncing={syncActive} phase={stats?.sync.phase ?? "idle"} done={stats?.sync.done ?? 0} total={stats?.sync.total ?? 0} compact={compact} />
+          </div>
           {CATEGORY_ORDER.map((c) => (
             <Column
               key={c}
