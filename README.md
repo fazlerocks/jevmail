@@ -1,12 +1,20 @@
 # Jevmail
 
-A read-only Gmail client that shows you only the mail that needs a reply.
+**Open-source AI email triage for Gmail.** Reach inbox zero by seeing only the mail that needs a reply. Read-only, local, and sorted by [Jev](https://vercel.com/ai-gateway/models/jev), TypeSafe AI's new decision model, through [Vercel AI Gateway](https://vercel.com/ai-gateway).
 
-Sorting is done by [Jev](https://vercel.com/ai-gateway/models/jev), TypeSafe AI's decision model, through [Vercel AI Gateway](https://vercel.com/ai-gateway). Jev isn't an LLM: it takes an email and a few typed questions and returns probabilities, not text. Nothing to parse, nothing to hallucinate, and about 3 cents per 1,000 emails.
-
-Every message lands in one of five trays: **Needs reply**, **Updates** (bank alerts, deliveries, receipts, OTPs), **Promos**, **Sales**, or **Spam**, with a 1–5 urgency score. You watch it happen: previews ride the progress bar, cross the Jev checkpoint, and drop into their tray.
+Every message lands in one of five trays: **Needs reply**, **Updates** (bank alerts, deliveries, receipts, OTPs), **Promos**, **Sales**, or **Spam**, with a 1–5 urgency score. You watch it happen: previews ride the progress bar, cross the Jev checkpoint, and drop into their tray. 1,000 emails sort in about a minute for around 3 cents.
 
 > Jevmail is an independent side project. It is not affiliated with TypeSafe AI, Vercel, or Google.
+
+## What is Jev?
+
+Jev is a "System One" model from [TypeSafe AI](https://typesafe.ai), released in September 2026 by ChatGPT co-creator Diogo Almeida. It is not a large language model and it never generates text. You give it a block of state and a set of typed questions, and it answers all of them at once with calibrated probabilities: a choice from your options, a score on your scale, or a yes/no. TypeSafe reports it runs 40 to 200 times faster than frontier LLMs and costs $0.042 per million input tokens with free output.
+
+For email classification that is exactly the right shape. Jevmail asks three questions per message: which tray, how urgent, and whether a human wrote it to you. There is no prompt to engineer, no JSON to repair, and no way for the model to invent a label that isn't in the list.
+
+## Why not an LLM?
+
+An AI email assistant built on a chat model has to write a prompt, parse the reply, validate the JSON, retry on failures, and still pays for output tokens. Jev skips all of it. On a 1,000-email inbox that is the difference between minutes and seconds, and between dollars and cents. It also makes the app honest about uncertainty: every tray shows Jev's top two probabilities, and your corrections are stored next to the original answer.
 
 ## The read-only guarantee
 
@@ -79,7 +87,13 @@ All optional, in `.env.local`:
 
 ## Stack
 
-Next.js 16, Auth.js, Drizzle + SQLite, AI SDK 7, Motion, shadcn/ui, Tailwind 4.
+Next.js 16, Auth.js, Drizzle + SQLite, AI SDK 7 (`experimental_evaluate`), Motion, shadcn/ui, Tailwind 4. Jev is called through Vercel AI Gateway, so the same code works with Gateway's free tier or paid credits, and with any other evaluation model the Gateway adds.
+
+## Related
+
+- [Jev on Vercel AI Gateway](https://vercel.com/ai-gateway/models/jev): model card, pricing, playground
+- [TypeSafe AI](https://typesafe.ai): the team behind Jev and System One models
+- [Vercel AI Gateway pricing](https://vercel.com/docs/ai-gateway/pricing): free tier and credits
 
 ## License
 
