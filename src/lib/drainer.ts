@@ -1,5 +1,5 @@
 import { db, schema } from "@/db";
-import { unclassifiedMessages, syncProgress, type StoredMessage } from "@/lib/gmail/sync";
+import { unclassifiedMessages, type StoredMessage } from "@/lib/gmail/sync";
 import { classifyMessage, GatewayForbiddenError, GatewayRateLimitedError } from "@/lib/classify";
 import { env } from "@/lib/env";
 import type { Category } from "@/db/schema";
@@ -103,8 +103,6 @@ async function tick() {
   const d = ensure();
   const { state } = d;
   if (state.inTick) return;
-  // Hold sorting while a fetch is in progress so it plays as one continuous run afterwards.
-  if (syncProgress().active) return;
   state.inTick = true;
   state.lastTickAt = Date.now();
   try {

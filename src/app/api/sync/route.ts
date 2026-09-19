@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   try {
     const gmail = gmailClient(session.accessToken!);
     const older = new URL(request.url).searchParams.get("older") === "1";
-    const result = await fetchNewMessages(gmail, db, older);
+    const result = await fetchNewMessages(gmail, db, older, kickDrain);
     const pending = unclassifiedMessages(db).length;
     console.log(`[sync] fetched ${result.inserted.length}, ${pending} pending${result.remaining ? `, ${result.remaining} more to pull` : ""}`);
     kickDrain();

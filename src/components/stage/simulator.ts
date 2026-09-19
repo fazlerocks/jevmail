@@ -85,6 +85,7 @@ export class Simulator implements StageApi {
       await new Promise((r) => setTimeout(r, 120));
       for (const m of toFetch.slice(i, i + 20)) m.fetched = true;
       this.syncState.done = Math.min(toFetch.length, i + 20);
+      if (this.syncState.done % 100 === 0 || this.syncState.done >= toFetch.length) this.startRun();
     }
     this.syncState.active = false;
     this.syncState.phase = "idle";
@@ -94,13 +95,13 @@ export class Simulator implements StageApi {
   }
 
   private startRun() {
-    const pending = this.msgs.filter((m) => m.fetched && !m.category);
-    if (!pending.length) return;
-    this.run = { active: true, startedAt: Date.now(), finishedAt: null, total: pending.length, classified: 0, usd: 0, rateLimited: false, error: null, elapsedMs: 0, perSec: 0, recent: [] };
-    let i = 0;
+    if (this.run.active) { this.run.total = this.run.classified + this.msgs.filter((m) => m.fetched && !m.category).length; return; }
+    if (!this.msgs.some((m) => m.fetched && !m.category)) return;
+    this.run = { active: true, startedAt: Date.now(), finishedAt: null, total: this.msgs.filter((m) => m.fetched && !m.category).length, classified: 0, usd: 0, rateLimited: false, error: null, elapsedMs: 0, perSec: 0, recent: [] };
     this.timer = setInterval(() => {
-      const m = pending[i++];
+      const m = this.msgs.find((x) => x.fetched && !x.category);
       if (!m) { clearInterval(this.timer!); this.run.active = false; this.run.finishedAt = Date.now(); return; }
+      const i = this.run.classified + 1;
       const conf = 0.82 + ((i * 37) % 18) / 100;
       m.category = m.truth; m.originalCategory = m.truth;
       m.categoryProbs = { [m.truth]: conf, updates: m.truth === "updates" ? conf : 1 - conf };

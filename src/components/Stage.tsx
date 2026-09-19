@@ -248,7 +248,7 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
   let right: React.ReactNode = "";
   let fraction = 0;
   if (syncActive && stats) {
-    mode = "fetching";
+    mode = runActive ? "sorting" : "fetching";
     const { phase, done, total, startedAt } = stats.sync;
     fraction = total ? done / total : 0.02;
     if (phase === "listing" || !total) label = "Fetching inbox…";
@@ -256,7 +256,7 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
       const elapsed = startedAt ? (stats.receivedAt - startedAt) / 1000 : 0;
       const rate = elapsed > 3 && done > 0 ? done / elapsed : 0;
       const left = rate ? Math.ceil((total - done) / rate / 60) : null;
-      label = <>Fetching {done.toLocaleString()} of {total.toLocaleString()}</>;
+      label = <>Fetching {done.toLocaleString()} of {total.toLocaleString()}{runActive && run ? <span className="text-ash"> · sorted {run.classified.toLocaleString()}</span> : null}</>;
       right = left ? `about ${left} min left` : "";
     }
   } else if (runActive && run) {
@@ -307,10 +307,10 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
           label={label}
           right={right}
           fraction={fraction}
-          laneOpen={expanded && mode !== "fetching"}
+          laneOpen={expanded && mode === "sorting"}
           decision={decision}
           scanning={flights.some((f) => f.gate)}
-          onLaneSettled={() => setTrackReady(expanded && mode !== "fetching")}
+          onLaneSettled={() => setTrackReady(expanded && mode === "sorting")}
         />
         <div className="mt-8 grid grid-cols-7 items-end gap-4 max-md:mt-4 max-md:grid-cols-4 max-md:gap-x-2 max-md:gap-y-3">
           <Column

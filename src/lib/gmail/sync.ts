@@ -179,17 +179,19 @@ export type SyncFetchResult = {
  * Pulls new inbox messages into the `messages` table, saving each batch as it
  * lands so a mid-run failure keeps its progress. Does not classify.
  */
-export async function fetchNewMessages(gmail: Gmail, db: Db, older = false): Promise<SyncFetchResult> {
+export const CHUNK = 100; // sorting starts as soon as this many have landed, and again for each chunk after
+
+export async function fetchNewMessages(gmail: Gmail, db: Db, older = false, onChunk?: () => void): Promise<SyncFetchResult> {
   setProgress({ active: true, phase: "listing", done: 0, total: 0, startedAt: Date.now() });
   throttled = false;
   try {
-    return await fetchNewMessagesInner(gmail, db, older);
+    return await fetchNewMessagesInner(gmail, db, older, onChunk);
   } finally {
     setProgress({ active: false, phase: "idle" });
   }
 }
 
-async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean): Promise<SyncFetchResult> {
+async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean, onChunk?: () => void): Promise<SyncFetchResult> {
   const state = getSyncState(db);
   let candidateIds: string[];
   let nextHistoryId: string;
@@ -210,7 +212,7 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean): Prom
       if (statusOf(err) === 404) {
         console.warn("[gmail] history id too old, falling back to full sync");
         setSyncState(db, null);
-        return fetchNewMessagesInner(gmail, db, false);
+        return fetchNewMessagesInner(gmail, db, false, onChunk);
       }
       throw err;
     }
@@ -267,6 +269,7 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean): Prom
       inserted.push(row);
     }
     setProgress({ done: Math.min(toFetch.length, i) });
+    if (onChunk && (inserted.length % CHUNK < size || i >= toFetch.length) && inserted.length > 0) onChunk();
     const floor = throttled ? SLOW_FLOOR_MS : BATCH_FLOOR_MS;
     const elapsed = Date.now() - started;
     if (elapsed < floor && i < toFetch.length) await sleep(floor - elapsed);
