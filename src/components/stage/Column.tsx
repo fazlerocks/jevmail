@@ -20,7 +20,7 @@ const Column = forwardRef<HTMLDivElement, {
         {/* the opening: where mail lands */}
         <div ref={ref} className="absolute left-1/2 size-0" style={{ top: size * 0.2 }} />
       </motion.div>
-      <div className={cn("text-[12px] max-md:-mt-4 max-md:text-[11px]", selected ? "font-medium text-ink" : "text-ash")}>{label}</div>
+      <div className={cn("text-[12px] max-md:-mt-1 max-md:text-[11px]", selected ? "font-medium text-ink" : "text-ash")}>{label}</div>
     </button>
   );
 });

@@ -25,7 +25,7 @@ export default function Preview({ from, gate, trackY, to, name, subject, onGate,
   const duration = withGate ? 1.4 : 0.5;
   return (
     <motion.div
-      className="pointer-events-none absolute left-0 top-0 z-20 overflow-hidden rounded-lg bg-white shadow-[0_2px_8px_rgba(0,0,0,0.10)]"
+      className="pointer-events-none absolute left-0 top-0 z-20 overflow-hidden rounded-lg bg-white shadow-[0_2px_8px_rgba(0,0,0,0.10)] max-md:hidden"
       style={{ marginLeft: -CARD_W / 2, marginTop: -CARD_H / 2, transformOrigin: "center" }}
       initial={{ x: from.x, y: from.y, width: SHEET_W, height: 2, opacity: 0 }}
       animate={{ x: xs, y: ys, width: ws, height: hs, opacity: withGate ? [0, 1, 1, 1, 0.5] : [0.6, 0.2] }}
