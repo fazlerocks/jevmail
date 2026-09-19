@@ -293,7 +293,7 @@ export default function Stage({ email, avatar, signOut, api = apiClient }: { ema
   return (
     <div className="mx-auto flex h-screen w-full max-w-[1040px] flex-col overflow-hidden px-6">
       <header className="flex shrink-0 items-center justify-between py-5">
-        <span className="text-[22px] font-semibold tracking-tight text-ink">Jevmail</span>
+        <span className="text-[26px] font-bold tracking-tight text-ink">Jevmail</span>
         <div className="flex items-center gap-3">
           {avatar ? (
             // eslint-disable-next-line @next/next/no-img-element
