@@ -6,8 +6,7 @@ import type { MessageView } from "@/lib/queries";
 import type { Category, FeedbackKind } from "@/db/schema";
 import { apiClient, CATEGORY_ORDER, TONE, type StageApi, type StageStats, type Decision } from "./stage/types";
 import Preview, { type Point } from "./stage/Preview";
-import SourceNode from "./stage/SourceNode";
-import JevNode from "./stage/JevNode";
+import ProgressBar, { LANE_H, type BarMode } from "./stage/ProgressBar";
 import Column from "./stage/Column";
 import MessageList, { LABEL } from "./MessageList";
 import { cn } from "@/lib/utils";
@@ -15,8 +14,6 @@ import { cn } from "@/lib/utils";
 const MAX_FLIGHTS = 4;   // previews on the track are a sample; stacks and counts carry the full rate
 const RELEASE_MS = 320;  // one preview leaves the source at most this often
 const QUEUE_MAX = 12;
-const TRACK_H = 84;
-const TRACK_TOTAL = 24 + TRACK_H + 40;
 const SETTLE_MS = 1500;  // keep the stage open briefly after the last preview lands
 
 const usd = (n: number) => (n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
@@ -26,7 +23,7 @@ const store = {
   set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch {} },
 };
 
-type Flight = { key: number; id: string; name: string; subject: string; from: Point; gate?: Point; to: Point; category: Category; text: string };
+type Flight = { key: number; id: string; name: string; subject: string; from: Point; gate?: Point; to: Point; trackY: number; category: Category; text: string };
 type Toast = { text: string; undo?: () => void };
 
 export default function Stage({ email, signOut, api = apiClient }: { email: string; signOut: React.ReactNode; api?: StageApi }) {
@@ -92,13 +89,16 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   };
 
   const spawn = useCallback((d: Decision, fromCategory?: Category) => {
-    const from = fromCategory ? point(stackRefs.current[fromCategory], "stackTop") : point(sourceRef.current, "stackTop");
+    const start = fromCategory ? point(stackRefs.current[fromCategory], "stackTop") : point(sourceRef.current);
+    // previews enter from the left end of the bar, fully on screen
+    const from = start && !fromCategory ? { x: start.x + 96, y: start.y } : start;
     const gate = fromCategory ? null : point(jevRef.current);
     const to = point(stackRefs.current[d.category], "stackTop");
     if (!from || !to || flightCount.current >= MAX_FLIGHTS) return false;
     flightCount.current++;
     const key = ++flightKey.current;
-    setFlights((f) => [...f, { key, id: d.id, name: d.from, subject: d.subject, from, gate: gate ?? undefined, to, category: d.category, text: `${LABEL[d.category]} · ${Math.round(d.confidence * 100)}%` }]);
+    const trackY = (gate?.y ?? from.y) - 3 - LANE_H / 2; // ride the lane just above the bar
+    setFlights((f) => [...f, { key, id: d.id, name: d.from, subject: d.subject, from, gate: gate ?? undefined, to, trackY, category: d.category, text: `${LABEL[d.category]} · ${Math.round(d.confidence * 100)}%` }]);
     return true;
   }, []);
 
@@ -218,47 +218,66 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   }, [items, showDone]);
 
   const pending = stats?.lanes.pending ?? 0;
-  const trackY = 24 + TRACK_H / 2;
   const compact = !expanded;
   const firstSync = !stats?.lastSyncedAt && syncActive;
 
-  // header readout: fetch progress with a rough time left, then sort progress
-  let status: React.ReactNode = "";
+
+  // the bar: what it says, how full it is
+  let mode: BarMode = "empty";
+  let label: React.ReactNode = "Not fetched yet";
+  let right: React.ReactNode = "";
+  let fraction = 0;
   if (syncActive && stats) {
+    mode = "fetching";
     const { phase, done, total, startedAt } = stats.sync;
-    if (phase === "listing" || !total) status = "Fetching inbox…";
+    fraction = total ? done / total : 0.02;
+    if (phase === "listing" || !total) label = "Fetching inbox…";
     else {
       const elapsed = startedAt ? (stats.receivedAt - startedAt) / 1000 : 0;
       const rate = elapsed > 3 && done > 0 ? done / elapsed : 0;
       const left = rate ? Math.ceil((total - done) / rate / 60) : null;
-      status = <>Fetching {done.toLocaleString()} of {total.toLocaleString()}{left ? ` · about ${left} min left` : ""}</>;
+      label = <>Fetching {done.toLocaleString()} of {total.toLocaleString()}</>;
+      right = left ? `about ${left} min left` : "";
     }
   } else if (runActive && run) {
-    status = <>Sorting {run.classified.toLocaleString()} of {run.total.toLocaleString()}</>;
+    mode = "sorting";
+    fraction = run.total ? run.classified / run.total : 0;
+    label = <>Sorting {run.classified.toLocaleString()} of {run.total.toLocaleString()}</>;
+    right = run.perSec ? `${run.perSec.toFixed(0)} per second` : "";
   } else if (pending > 0) {
-    status = `${pending.toLocaleString()} waiting to sort`;
-  } else if (stats?.lastSyncedAt) {
-    status = <>Synced {ago(stats.lastSyncedAt)} · <button onClick={sync} className="text-ash underline decoration-hair-strong underline-offset-4 hover:text-ink">Sync now</button></>;
+    mode = "sorting";
+    fraction = items.length ? (items.length - pending) / items.length : 0;
+    label = `${pending.toLocaleString()} waiting to sort`;
+    right = run?.rateLimited && stats?.drain.nextInMs != null ? `next ${stats.drain.burst} in ${Math.max(1, Math.round(stats.drain.nextInMs / 60000))} min` : "";
+  } else if (items.length > 0) {
+    mode = "idle";
+    fraction = 1;
+    label = <>Gmail inbox · {items.length.toLocaleString()} emails</>;
+    right = stats?.lastSyncedAt ? <>Synced {ago(stats.lastSyncedAt)} · <button onClick={sync} className="underline decoration-hair-strong underline-offset-4 hover:text-ink">Sync now</button></> : "";
   }
 
   return (
     <div className="mx-auto w-full max-w-[1040px] px-6">
-      <header className="relative flex flex-col items-center gap-3 py-8">
+      <header className="relative flex items-center justify-center py-8">
         <span className="text-[24px] font-light tracking-[0.08em] text-ink" title={email}>Jevmail</span>
-        <div className="text-[12px] tracking-[0.02em] tabular-nums text-ash md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2">{status}</div>
-        <div className="absolute right-0 top-8 md:top-1/2 md:-translate-y-1/2">{signOut}</div>
+        <div className="absolute right-0 top-1/2 -translate-y-1/2">{signOut}</div>
       </header>
 
-      {/* the stage: slim between syncs, opens while mail is being sorted */}
+      {/* the stage: the inbox bar on top, five sorted stacks below */}
       <div ref={stageRef} className="relative mt-2">
-        <motion.div className="relative overflow-hidden" initial={false} animate={{ height: expanded ? TRACK_TOTAL : 0, opacity: expanded ? 1 : 0 }} transition={{ duration: 0.35, ease: "easeInOut" }} onAnimationComplete={() => setTrackReady(expanded)}>
-          <JevNode ref={jevRef} decision={decision} scanning={flights.some((f) => f.gate)} height={TRACK_H} />
-        </motion.div>
-        <div className="grid grid-cols-6 items-end max-md:grid-cols-3 max-md:gap-y-10">
-          {/* the source stands apart from the five sorted stacks */}
-          <div className="self-end md:mr-10 md:border-r md:border-hair md:pr-6">
-            <SourceNode ref={sourceRef} pulled={items.length} syncing={syncActive} phase={stats?.sync.phase ?? "idle"} done={stats?.sync.done ?? 0} total={stats?.sync.total ?? 0} compact={compact} />
-          </div>
+        <ProgressBar
+          ref={sourceRef}
+          gateRef={jevRef}
+          mode={mode}
+          label={label}
+          right={right}
+          fraction={fraction}
+          laneOpen={expanded && mode !== "fetching"}
+          decision={decision}
+          scanning={flights.some((f) => f.gate)}
+          onLaneSettled={() => setTrackReady(expanded && mode !== "fetching")}
+        />
+        <div className="mt-10 grid grid-cols-5 items-end max-md:grid-cols-3 max-md:gap-y-10">
           {CATEGORY_ORDER.map((c) => (
             <Column
               key={c}
@@ -274,7 +293,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
           ))}
         </div>
         {flights.map((f) => (
-          <Preview key={f.key} from={f.from} gate={f.gate} trackY={trackY} to={f.to} name={f.name} subject={f.subject}
+          <Preview key={f.key} from={f.from} gate={f.gate} trackY={f.trackY} to={f.to} name={f.name} subject={f.subject}
             onGate={() => setDecision((d) => (d?.key === f.key ? d : { text: f.text, category: f.category, key: f.key }))}
             onDone={() => land(f)} />
         ))}

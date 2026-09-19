@@ -1,0 +1,61 @@
+"use client";
+
+import { forwardRef, type ReactNode } from "react";
+import { motion } from "motion/react";
+import type { Category } from "@/db/schema";
+import { TONE } from "./types";
+import GmailMark from "./GmailMark";
+
+export const LANE_H = 46;   // room for a preview card riding the bar
+export const DECISION_H = 22;
+
+export type BarMode = "empty" | "fetching" | "sorting" | "idle";
+
+/**
+ * The inbox as a bar. Fills while fetching, carries previews across the Jev
+ * tick while sorting, and rests as a labeled line otherwise. Never blank.
+ */
+const ProgressBar = forwardRef<HTMLDivElement, {
+  mode: BarMode;
+  label: ReactNode;
+  right: ReactNode;
+  fraction: number;            // 0..1 fill
+  laneOpen: boolean;           // preview lane above the bar
+  decision: { text: string; category: Category; key: number } | null;
+  scanning: boolean;
+  gateRef: React.Ref<HTMLDivElement>;
+  onLaneSettled: () => void;
+}>(function ProgressBar({ mode, label, right, fraction, laneOpen, decision, scanning, gateRef, onLaneSettled }, startRef) {
+  const fillTone = mode === "sorting" ? "var(--ink)" : mode === "fetching" ? "var(--ink)" : "var(--hair-strong)";
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-6 text-[12px] tracking-[0.02em]">
+        <span className="flex items-center gap-2 whitespace-nowrap text-ink"><GmailMark /> {label}</span>
+        <span className="whitespace-nowrap text-ash">{right}</span>
+      </div>
+
+      {/* preview lane, open only while sorting */}
+      <motion.div className="relative overflow-hidden" initial={false} animate={{ height: laneOpen ? DECISION_H + LANE_H : 0 }} transition={{ duration: 0.35, ease: "easeInOut" }} onAnimationComplete={onLaneSettled}>
+        <div className="absolute left-1/2 top-0 h-[22px] -translate-x-1/2 whitespace-nowrap text-[13px] leading-none tabular-nums">
+          {decision && (
+            <motion.span key={decision.key} initial={{ opacity: 0, y: 3 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18 }} style={{ color: TONE[decision.category] }}>
+              {decision.text}
+            </motion.span>
+          )}
+        </div>
+      </motion.div>
+
+      {/* the bar */}
+      <div className="relative mt-3 h-px w-full bg-hair">
+        <div ref={startRef} className="absolute left-0 top-0 size-0" />
+        <motion.div className="absolute left-0 top-0 h-px" style={{ background: fillTone }} initial={false} animate={{ width: `${Math.round(Math.max(0, Math.min(1, fraction)) * 1000) / 10}%` }} transition={{ duration: 0.3, ease: "easeOut" }} />
+        {/* the Jev tick at the midpoint */}
+        <div ref={gateRef} className="absolute left-1/2 top-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-hair-strong">
+          {scanning && <motion.div className="absolute left-0 top-0 w-px bg-shu" animate={{ height: ["0%", "100%", "0%"] }} transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }} />}
+        </div>
+      </div>
+      <div className="mt-2 text-center text-[11px] tracking-[0.04em] text-ash">Jev</div>
+    </div>
+  );
+});
+export default ProgressBar;
