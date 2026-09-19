@@ -2,7 +2,7 @@ import { requireSession } from "@/lib/session";
 import { db, schema } from "@/db";
 import { gmailClient } from "@/lib/gmail/client";
 import { fetchNewMessages, unclassifiedMessages } from "@/lib/gmail/sync";
-import { classifyMessage, GatewayForbiddenError } from "@/lib/classify";
+import { classifyMessage, GatewayForbiddenError, GatewayRateLimitedError } from "@/lib/classify";
 import { env } from "@/lib/env";
 
 const g = globalThis as unknown as { __jevmailSyncLock?: boolean };
@@ -32,8 +32,12 @@ export async function POST() {
     // Retry anything stored earlier that still lacks a classification, then the new ones.
     const toClassify = [...unclassifiedMessages(db).filter((m) => !result.inserted.some((n) => n.id === m.id)), ...result.inserted];
 
+    let last = 0;
     for (const m of toClassify) {
       if (gatewayError) break;
+      const gap = env.jevMinIntervalMs - (Date.now() - last);
+      if (gap > 0) await new Promise((r) => setTimeout(r, gap));
+      last = Date.now();
       try {
         const c = await classifyMessage(m);
         db.insert(schema.classifications)
@@ -44,6 +48,8 @@ export async function POST() {
       } catch (err) {
         if (err instanceof GatewayForbiddenError) {
           gatewayError = err.message;
+        } else if (err instanceof GatewayRateLimitedError) {
+          gatewayError = "Jev free-tier rate limit hit. Remaining messages stay in Pending; sync again later.";
         } else {
           console.error("[classify]", m.id, err);
           failed++;

@@ -1,4 +1,4 @@
-import { experimental_evaluate as evaluate, APICallError } from "ai";
+import { experimental_evaluate as evaluate } from "ai";
 import { CATEGORIES, type Category } from "@/db/schema";
 
 export const JEV_MODEL = "typesafe-ai/jev";
@@ -76,8 +76,29 @@ export class GatewayForbiddenError extends Error {
   }
 }
 
-function isStatus(err: unknown, code: number): boolean {
-  return APICallError.isInstance(err) && err.statusCode === code;
+/** Thrown when the gateway keeps returning 429 after the retry. The caller should stop for this run. */
+export class GatewayRateLimitedError extends Error {
+  retryAfterMs: number | null;
+  constructor(message: string, retryAfterMs: number | null) {
+    super(message);
+    this.name = "GatewayRateLimitedError";
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+type GatewayErr = { statusCode?: number; message?: string; responseHeaders?: Record<string, string> };
+
+function statusOf(err: unknown): number | undefined {
+  return (err as GatewayErr)?.statusCode;
+}
+
+function retryAfterMs(err: unknown): number | null {
+  const h = (err as GatewayErr)?.responseHeaders?.["retry-after"];
+  if (!h) return null;
+  const s = Number(h);
+  if (Number.isFinite(s) && s >= 0) return s * 1000;
+  const d = Date.parse(h);
+  return Number.isNaN(d) ? null : Math.max(0, d - Date.now());
 }
 
 export async function classifyMessage(m: ClassifyInput): Promise<Classification> {
@@ -88,11 +109,20 @@ export async function classifyMessage(m: ClassifyInput): Promise<Classification>
   try {
     result = await run();
   } catch (err) {
-    if (isStatus(err, 429)) {
-      await new Promise((r) => setTimeout(r, 2000));
-      result = await run();
-    } else if (isStatus(err, 403)) {
-      throw new GatewayForbiddenError((err as APICallError).message);
+    const status = statusOf(err);
+    if (status === 429) {
+      const wait = retryAfterMs(err) ?? 5000;
+      await new Promise((r) => setTimeout(r, Math.min(wait, 30_000)));
+      try {
+        result = await run();
+      } catch (err2) {
+        if (statusOf(err2) === 429) {
+          throw new GatewayRateLimitedError((err2 as GatewayErr).message ?? "rate limited", retryAfterMs(err2));
+        }
+        throw err2;
+      }
+    } else if (status === 403) {
+      throw new GatewayForbiddenError((err as GatewayErr).message ?? "forbidden");
     } else {
       throw err;
     }

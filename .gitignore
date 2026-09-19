@@ -42,3 +42,6 @@ next-env.d.ts
 
 # jevmail local database
 /data/
+
+# local probe scripts
+/scripts/
