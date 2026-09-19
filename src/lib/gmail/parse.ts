@@ -2,6 +2,7 @@ import { convert } from "html-to-text";
 import { parseOneAddress } from "email-addresses";
 import type { gmail_v1 } from "googleapis";
 import { env } from "@/lib/env";
+import { stripNoise } from "@/lib/text";
 
 export type ParsedMessage = {
   id: string;
@@ -56,11 +57,7 @@ function extractBody(payload: Part | undefined): string {
 }
 
 export function cleanText(s: string, max = env.maxBodyChars): string {
-  const collapsed = s
-    .replace(/\r/g, "")
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/<https?:\/\/[^>]+>/g, " ")
-    .replace(/https?:\/\/\S+/g, " ")
+  const collapsed = stripNoise(s.replace(/\r/g, ""))
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/[ \t]{2,}/g, " ")

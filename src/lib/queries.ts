@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { CATEGORIES, type Category, type FeedbackKind } from "@/db/schema";
 import { drainState } from "@/lib/drainer";
 import { env } from "@/lib/env";
+import { stripNoise } from "@/lib/text";
 
 export type Lane = Category | "pending" | "all";
 
@@ -63,7 +64,7 @@ function allViews(): MessageView[] {
       fromName: m.fromName,
       fromEmail: m.fromEmail,
       subject: m.subject,
-      snippet: m.snippet,
+      snippet: stripNoise(m.snippet),
       receivedAt: m.receivedAt,
       hasUnsubscribe: m.hasUnsubscribe,
       isReplyToMe: m.isReplyToMe,

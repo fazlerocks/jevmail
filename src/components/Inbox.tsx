@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronDown, RefreshCw, Inbox as InboxIcon, Tag, ArrowUpRight } from "lucide-react";
+import { Check, ChevronDown, RefreshCw, Inbox as InboxIcon, Tag, ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -120,25 +120,27 @@ function MessageCard({ m, open, onToggle, onDone, onMove, compact }: {
   return compact ? body : <Card className="gap-0 py-0">{body}</Card>;
 }
 
-function Bundle({ label, tone, items, open, onToggle, openId, setOpenId, onDone, onMove, onSweep }: {
+function Bundle({ label, tone, items, open, onToggle, openId, setOpenId, onDone, onMove, onSweep, icon, hint }: {
   label: string; tone: string; items: MessageView[]; open: boolean; onToggle: () => void;
   openId: string | null; setOpenId: (id: string | null) => void;
-  onDone: (m: MessageView) => void; onMove: (m: MessageView, c: Category) => void; onSweep: () => void;
+  onDone: (m: MessageView) => void; onMove: (m: MessageView, c: Category) => void; onSweep?: () => void;
+  icon?: React.ReactNode; hint?: string;
 }) {
   const senders = [...new Set(items.map((m) => m.fromName || m.fromEmail))].slice(0, 3).join(", ");
   return (
     <Card className="gap-0 py-0">
       <Collapsible open={open} onOpenChange={onToggle} className="group">
         <CollapsibleTrigger render={<div />} nativeButton={false} className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left">
-          <Avatar tone={tone}><InboxIcon className="size-4" /></Avatar>
+          <Avatar tone={tone}>{icon ?? <InboxIcon className="size-4" />}</Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
               <span className="text-[15px] font-medium">{label}</span>
               <Badge variant="secondary">{items.length}</Badge>
+              {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
             </div>
             <div className="truncate text-[13px] text-muted-foreground">{senders}</div>
           </div>
-          <DoneButton onClick={onSweep} title="Sweep: mark all done" />
+          {onSweep && <DoneButton onClick={onSweep} title="Sweep: mark all done" />}
           <ChevronDown className={cn("size-4 text-muted-foreground/60 transition", open && "rotate-180")} />
         </CollapsibleTrigger>
         <CollapsibleContent className="divide-y border-t">
@@ -218,22 +220,21 @@ export default function Inbox() {
     return [...map.entries()].map(([key, list]) => ({
       key,
       label: dayLabel(list[0].receivedAt),
-      cards: filter === "all" ? list.filter((m) => m.category === "needs_reply" || m.category === null) : list,
+      cards: filter === "all" ? list.filter((m) => m.category === "needs_reply") : list,
+      pending: filter === "all" ? list.filter((m) => m.category === null) : [],
       bundles: filter === "all" ? BUNDLES.map((b) => ({ ...b, items: list.filter((m) => m.category === b.key) })).filter((b) => b.items.length) : [],
     }));
   }, [items, showDone, filter]);
 
   const pending = stats?.lanes.pending ?? 0;
   const toggleBundle = (k: string) => setOpenBundles((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); return n; });
-  const status = pending > 0
-    ? `Sorting ${pending}${stats?.drain.inTick ? "…" : stats?.drain.nextInMs != null ? ` · next ${stats.drain.burst} in ${Math.max(1, Math.round(stats.drain.nextInMs / 60000))} min` : ""}`
-    : stats?.lastSyncedAt ? "All sorted" : "";
+  const status = pending > 0 ? `${pending} still sorting` : stats?.lastSyncedAt ? "All sorted" : "";
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-24">
       <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 py-1 [scrollbar-width:none]">
         {([{ key: "all", label: "All", tone: "" }, { key: "needs_reply", label: "Needs reply", tone: "bg-blue-500" }, ...BUNDLES] as { key: "all" | Category; label: string; tone: string }[]).map((c) => {
-          const count = c.key === "all" ? Object.entries(stats?.lanes ?? {}).filter(([k]) => k !== "pending").reduce((a, [, n]) => a + n, 0) : stats?.lanes[c.key] ?? 0;
+          const count = c.key === "all" ? Object.values(stats?.lanes ?? {}).reduce((a, n) => a + n, 0) : stats?.lanes[c.key] ?? 0;
           const active = filter === c.key;
           return (
             <Button
@@ -277,6 +278,12 @@ export default function Inbox() {
                 {d.cards.map((m) => (
                   <MessageCard key={m.id} m={m} open={openId === m.id} onToggle={() => setOpenId(openId === m.id ? null : m.id)} onDone={() => done(m)} onMove={(c) => move(m, c)} />
                 ))}
+                {d.pending.length > 0 && (
+                  <Bundle label="Sorting" tone="bg-zinc-300" items={d.pending} icon={<Loader2 className="size-4 animate-spin text-zinc-600" />}
+                    hint={stats?.drain.nextInMs != null && !stats.drain.inTick ? `next ${stats.drain.burst} in ${Math.max(1, Math.round(stats.drain.nextInMs / 60000))} min` : undefined}
+                    open={openBundles.has(`${d.key}:pending`)} onToggle={() => toggleBundle(`${d.key}:pending`)}
+                    openId={openId} setOpenId={setOpenId} onDone={done} onMove={move} />
+                )}
                 {d.bundles.map((b) => (
                   <Bundle key={b.key} label={b.label} tone={b.tone} items={b.items}
                     open={openBundles.has(`${d.key}:${b.key}`)} onToggle={() => toggleBundle(`${d.key}:${b.key}`)}

@@ -1,5 +1,6 @@
 import { experimental_evaluate as evaluate } from "ai";
 import { CATEGORIES, type Category } from "@/db/schema";
+import { stripNoise } from "@/lib/text";
 
 export const JEV_MODEL = "typesafe-ai/jev";
 
@@ -21,17 +22,6 @@ export type Classification = {
   lowConfidence: boolean;
   model: string;
 };
-
-/** Remove tracking URLs, markdown image syntax, and angle-bracketed links that add noise without signal. */
-export function stripNoise(text: string): string {
-  return text
-    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
-    .replace(/<https?:\/\/[^>]+>/g, " ")
-    .replace(/https?:\/\/\S+/g, " ")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
 
 export function buildState(m: ClassifyInput): string {
   return [
