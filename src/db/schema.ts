@@ -31,6 +31,7 @@ export const classifications = sqliteTable("classifications", {
   isPersonal: real("is_personal").notNull(),
   lowConfidence: integer("low_confidence", { mode: "boolean" }).notNull().default(false),
   model: text("model").notNull(),
+  inputTokens: integer("input_tokens"),
   classifiedAt: integer("classified_at").notNull(),
 });
 

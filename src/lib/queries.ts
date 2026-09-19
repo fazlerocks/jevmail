@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { CATEGORIES, type Category, type FeedbackKind } from "@/db/schema";
 import { drainState } from "@/lib/drainer";
@@ -130,11 +130,13 @@ export function stats() {
   const agreement = classified === 0 ? 1 : (classified - corrected) / classified;
 
   const st = db.select().from(schema.syncState).where(eq(schema.syncState.id, 1)).get();
+  const tokens = db.select({ n: sql<number>`coalesce(sum(${schema.classifications.inputTokens}), 0)` }).from(schema.classifications).get()?.n ?? 0;
   return {
     lanes,
     classified,
     corrected,
     agreement,
+    usd: tokens * env.jevUsdPerInputToken,
     lastSyncedAt: st?.lastSyncedAt ?? null,
     drain: (() => {
       const d = drainState();

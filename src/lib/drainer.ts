@@ -57,14 +57,14 @@ export function drainState(): DrainState {
 async function classifyOne(m: StoredMessage, run: RunState) {
   const { inputTokens, ...c } = await classifyMessage(m);
   db.insert(schema.classifications)
-    .values({ messageId: m.id, ...c, classifiedAt: Date.now() })
+    .values({ messageId: m.id, ...c, inputTokens, classifiedAt: Date.now() })
     .onConflictDoNothing()
     .run();
   run.classified++;
   run.inputTokens += inputTokens;
   run.usd = run.inputTokens * env.jevUsdPerInputToken;
   const top = Object.entries(c.categoryProbs).sort((a, b) => b[1] - a[1])[0];
-  run.recent = [{ id: m.id, from: m.fromName || m.fromEmail, subject: m.subject, category: c.category, confidence: top?.[1] ?? 1, at: Date.now() }, ...run.recent].slice(0, 12);
+  run.recent = [{ id: m.id, from: m.fromName || m.fromEmail, subject: m.subject, category: c.category, confidence: top?.[1] ?? 1, at: Date.now() }, ...run.recent].slice(0, 40);
 }
 
 /** Classify up to `limit` pending messages with a small worker pool. */

@@ -1,8 +1,12 @@
 # Jevmail
 
-A local, read-only Gmail triage board sorted by [Jev](https://vercel.com/ai-gateway/models/jev), TypeSafe AI's decision model, through Vercel AI Gateway.
+A local, read-only Gmail client that shows you only the mail that needs a reply. Sorting is done by [Jev](https://vercel.com/ai-gateway/models/jev), TypeSafe AI's decision model, through Vercel AI Gateway.
 
-Every new inbox message lands in one of five lanes: **Needs reply**, **Updates** (transactional: bank alerts, deliveries, receipts, OTPs), **Promotional**, **Sales**, or **Spam**, with a 1–5 urgency score. Jev returns typed probabilities instead of text, so there is nothing to parse and nothing to hallucinate.
+Every inbox message lands in one of five stacks: **Needs reply**, **Updates** (transactional: bank alerts, deliveries, receipts, OTPs), **Promos**, **Sales**, or **Spam**, with a 1–5 urgency score. Jev returns typed probabilities instead of text, so there is nothing to parse and nothing to hallucinate.
+
+The screen is a slim sorter strip (inbox count, the Jev gate, five paper stacks) over a Superhuman-style list with a reading pane. The strip opens while mail is being sorted, showing each email cross the gate and land on its stack, then settles back. Syncing is automatic. Keyboard: `j` `k` move, `e` done, `o` open in Gmail, `esc` close.
+
+A dev-only `/preview` route drives the same screen from a simulator so the animation can be tuned without Google or Jev credentials.
 
 ## The read-only guarantee
 

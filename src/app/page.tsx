@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth, signOut } from "@/auth";
 import { missingEnv } from "@/lib/env";
-import Inbox from "@/components/Inbox";
+import Stage from "@/components/Stage";
 
 export default async function Home() {
   const missing = missingEnv();
@@ -12,11 +12,11 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen">
-      <Inbox
+      <Stage
         email={session.user?.email ?? ""}
         signOut={
           <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
-            <button className="text-[13px] text-muted-foreground hover:text-foreground">Sign out</button>
+            <button className="text-[12px] tracking-[0.04em] text-ash hover:text-ink">Sign out</button>
           </form>
         }
       />

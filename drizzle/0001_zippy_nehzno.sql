@@ -1,0 +1,1 @@
+ALTER TABLE `classifications` ADD `input_tokens` integer;
