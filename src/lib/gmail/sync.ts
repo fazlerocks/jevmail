@@ -15,8 +15,17 @@ import { env } from "@/lib/env";
  *   5,000 units per minute, well under the limit.
  */
 
-const BATCH = 10;
+const BATCH = 20; // 20 x messages.get (5 units) per 600 ms = 10,000 units/min, under the 15,000 limit
 const BATCH_FLOOR_MS = 600;
+
+export type SyncProgress = { active: boolean; phase: "idle" | "listing" | "fetching"; done: number; total: number; startedAt: number | null };
+const sp = globalThis as unknown as { __jevmailSyncProgress?: SyncProgress };
+export function syncProgress(): SyncProgress {
+  return sp.__jevmailSyncProgress ?? { active: false, phase: "idle", done: 0, total: 0, startedAt: null };
+}
+function setProgress(patch: Partial<SyncProgress>) {
+  sp.__jevmailSyncProgress = { ...syncProgress(), ...patch };
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -46,13 +55,20 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   }
 }
 
-/** The newest `limit` inbox messages. Gmail returns them newest first. */
+/** The newest `limit` inbox messages, newest first. Gmail pages at 500. */
 async function listInboxIds(gmail: Gmail, limit: number): Promise<string[]> {
-  const res = await withRetry(
-    () => gmail.users.messages.list({ userId: "me", q: "in:inbox", maxResults: limit }),
-    "messages.list",
-  );
-  return (res.data.messages ?? []).map((m) => m.id!).filter(Boolean);
+  const ids: string[] = [];
+  let pageToken: string | undefined;
+  while (ids.length < limit) {
+    const res = await withRetry(
+      () => gmail.users.messages.list({ userId: "me", q: "in:inbox", maxResults: Math.min(500, limit - ids.length), pageToken }),
+      "messages.list",
+    );
+    for (const m of res.data.messages ?? []) if (m.id) ids.push(m.id);
+    pageToken = res.data.nextPageToken ?? undefined;
+    if (!pageToken) break;
+  }
+  return ids.slice(0, limit);
 }
 
 async function listHistoryIds(gmail: Gmail, startHistoryId: string): Promise<{ ids: string[]; historyId: string }> {
@@ -137,6 +153,15 @@ export type SyncFetchResult = {
  * lands so a mid-run failure keeps its progress. Does not classify.
  */
 export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchResult> {
+  setProgress({ active: true, phase: "listing", done: 0, total: 0, startedAt: Date.now() });
+  try {
+    return await fetchNewMessagesInner(gmail, db);
+  } finally {
+    setProgress({ active: false, phase: "idle" });
+  }
+}
+
+async function fetchNewMessagesInner(gmail: Gmail, db: Db): Promise<SyncFetchResult> {
   const state = getSyncState(db);
   let candidateIds: string[];
   let nextHistoryId: string;
@@ -152,7 +177,7 @@ export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchR
       if (statusOf(err) === 404) {
         console.warn("[gmail] history id too old, falling back to full sync");
         setSyncState(db, null);
-        return fetchNewMessages(gmail, db);
+        return fetchNewMessagesInner(gmail, db);
       }
       throw err;
     }
@@ -175,6 +200,7 @@ export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchR
   const remaining = newIds.length - toFetch.length;
 
   const sent = toFetch.length ? await sentThreadIds(gmail, 60) : new Set<string>();
+  setProgress({ phase: "fetching", done: 0, total: toFetch.length });
 
   const inserted: StoredMessage[] = [];
   for (let i = 0; i < toFetch.length; i += BATCH) {
@@ -197,6 +223,7 @@ export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchR
       db.insert(schema.messages).values({ ...row, syncedAt: now }).onConflictDoNothing().run();
       inserted.push(row);
     }
+    setProgress({ done: Math.min(toFetch.length, i + BATCH) });
     const elapsed = Date.now() - started;
     if (elapsed < BATCH_FLOOR_MS && i + BATCH < toFetch.length) await sleep(BATCH_FLOOR_MS - elapsed);
   }

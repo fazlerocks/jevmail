@@ -21,6 +21,8 @@ export type Classification = {
   isPersonal: number; // P(true)
   lowConfidence: boolean;
   model: string;
+  /** Not stored; used for the live cost meter. */
+  inputTokens: number;
 };
 
 export function buildState(m: ClassifyInput): string {
@@ -150,5 +152,6 @@ export async function classifyMessage(m: ClassifyInput): Promise<Classification>
     isPersonal: per.probability,
     lowConfidence,
     model: result.response?.modelId ?? JEV_MODEL,
+    inputTokens: result.usage?.inputTokens ?? 0,
   };
 }

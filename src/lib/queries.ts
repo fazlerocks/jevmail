@@ -2,6 +2,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { CATEGORIES, type Category, type FeedbackKind } from "@/db/schema";
 import { drainState } from "@/lib/drainer";
+import { syncProgress } from "@/lib/gmail/sync";
 import { env } from "@/lib/env";
 import { stripNoise } from "@/lib/text";
 
@@ -122,7 +123,18 @@ export function stats() {
     lastSyncedAt: st?.lastSyncedAt ?? null,
     drain: (() => {
       const d = drainState();
-      return { ...d, nextInMs: d.nextTickAt ? Math.max(0, d.nextTickAt - Date.now()) : null, burst: env.jevBurst, intervalMs: env.jevDrainIntervalMs };
+      const now = Date.now();
+      const elapsedMs = d.run.startedAt ? (d.run.finishedAt ?? now) - d.run.startedAt : 0;
+      const perSec = elapsedMs > 500 ? d.run.classified / (elapsedMs / 1000) : 0;
+      return {
+        ...d,
+        run: { ...d.run, elapsedMs, perSec },
+        nextInMs: d.nextTickAt ? Math.max(0, d.nextTickAt - now) : null,
+        burst: env.jevBurst,
+        intervalMs: env.jevDrainIntervalMs,
+        concurrency: env.jevConcurrency,
+      };
     })(),
+    sync: syncProgress(),
   };
 }
