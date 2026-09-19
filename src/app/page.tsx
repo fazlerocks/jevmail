@@ -12,25 +12,15 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
-          <div className="flex items-baseline gap-3">
-            <span className="text-lg font-semibold tracking-tight">Jevmail</span>
-            <span className="hidden text-xs text-zinc-500 sm:inline">{session.user?.email}</span>
-          </div>
-          <form
-            action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}
-          >
-            <button className="text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-white">Sign out</button>
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-4">
+          <span className="text-[17px] font-semibold tracking-tight" title={session.user?.email ?? ""}>Jevmail</span>
+          <form action={async () => { "use server"; await signOut({ redirectTo: "/login" }); }}>
+            <button className="text-[13px] text-muted-foreground hover:text-foreground">Sign out</button>
           </form>
         </div>
       </header>
-      <div className="mx-auto max-w-6xl px-4 py-4">
-        <Inbox />
-      </div>
+      <Inbox />
     </main>
   );
 }
