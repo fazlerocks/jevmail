@@ -1,10 +1,9 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { CATEGORIES, type Category, type FeedbackKind } from "@/db/schema";
 import { drainState } from "@/lib/drainer";
 import { syncProgress } from "@/lib/gmail/sync";
 import { env } from "@/lib/env";
-import { stripNoise } from "@/lib/text";
 
 export type Lane = Category | "pending" | "all";
 
@@ -48,7 +47,19 @@ function feedbackSummaries(): Map<string, FeedbackSummary> {
   return map;
 }
 
+// Reads are polled every 300 ms during a live run; a 150 ms cache keeps them cheap
+// while writes (which happen in this same process) still show up within a poll.
+let viewsCache: { at: number; views: MessageView[] } | null = null;
+export function invalidateViews() { viewsCache = null; }
+
 function allViews(): MessageView[] {
+  if (viewsCache && Date.now() - viewsCache.at < 150) return viewsCache.views;
+  const views = buildViews();
+  viewsCache = { at: Date.now(), views };
+  return views;
+}
+
+function buildViews(): MessageView[] {
   const fb = feedbackSummaries();
   const rows = db
     .select({ m: schema.messages, c: schema.classifications })
@@ -65,7 +76,7 @@ function allViews(): MessageView[] {
       fromName: m.fromName,
       fromEmail: m.fromEmail,
       subject: m.subject,
-      snippet: stripNoise(m.snippet),
+      snippet: m.snippet,
       receivedAt: m.receivedAt,
       hasUnsubscribe: m.hasUnsubscribe,
       isReplyToMe: m.isReplyToMe,
@@ -102,16 +113,20 @@ export function getMessage(id: string): MessageView | null {
 
 export function addFeedback(messageId: string, kind: FeedbackKind, value?: string) {
   db.insert(schema.feedback).values({ messageId, kind, value: value ?? null, createdAt: Date.now() }).run();
+  invalidateViews();
 }
 
 export function stats() {
-  const views = allViews().filter((v) => !v.handled);
+  const all = allViews();
   const lanes: Record<string, number> = { pending: 0 };
   for (const c of CATEGORIES) lanes[c] = 0;
-  for (const v of views) lanes[v.category ?? "pending"]++;
-
-  const classified = db.select({ n: sql<number>`count(*)` }).from(schema.classifications).get()?.n ?? 0;
-  const corrected = allViews().filter((v) => v.corrected).length;
+  let classified = 0;
+  let corrected = 0;
+  for (const v of all) {
+    if (v.originalCategory) classified++;
+    if (v.corrected) corrected++;
+    if (!v.handled) lanes[v.category ?? "pending"]++;
+  }
   const agreement = classified === 0 ? 1 : (classified - corrected) / classified;
 
   const st = db.select().from(schema.syncState).where(eq(schema.syncState.id, 1)).get();

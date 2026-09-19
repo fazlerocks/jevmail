@@ -191,9 +191,13 @@ export default function Inbox({ email, signOut }: { email: string; signOut: Reac
   const prevItems = useRef<MessageView[]>([]);
   const prevRunActive = useRef(false);
   const prevCounts = useRef<Record<string, number>>({});
+  const inFlight = useRef(false);
   const [pulses, setPulses] = useState<Record<string, number>>({});
 
   const load = useCallback(async () => {
+    if (inFlight.current) return; // don't stack polls if the server is slower than the interval
+    inFlight.current = true;
+    try {
     const [m, s] = await Promise.all([
       fetch(`/api/messages?lane=all&includeHandled=${showDone}&limit=1200`).then((r) => r.json()),
       fetch("/api/stats").then((r) => r.json()),
@@ -230,6 +234,9 @@ export default function Inbox({ email, signOut }: { email: string; signOut: Reac
     setItems(next);
     setStats(s);
     setLoaded(true);
+    } finally {
+      inFlight.current = false;
+    }
   }, [showDone]);
 
   useEffect(() => {
