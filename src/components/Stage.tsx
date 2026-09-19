@@ -17,7 +17,6 @@ const RELEASE_MS = 320;  // one preview leaves the source at most this often
 const QUEUE_MAX = 12;
 const TRACK_H = 84;
 const TRACK_TOTAL = 24 + TRACK_H + 40;
-const AUTO_SYNC_MS = 5 * 60_000;
 const SETTLE_MS = 1500;  // keep the stage open briefly after the last preview lands
 
 const usd = (n: number) => (n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
@@ -32,7 +31,7 @@ type Toast = { text: string; undo?: () => void };
 
 export default function Stage({ email, signOut, api = apiClient }: { email: string; signOut: React.ReactNode; api?: StageApi }) {
   const [items, setItems] = useState<MessageView[]>([]);
-  const [stats, setStats] = useState<StageStats | null>(null);
+  const [stats, setStats] = useState<(StageStats & { receivedAt: number }) | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const [selected, setSelected] = useState<Category>("needs_reply");
@@ -148,7 +147,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
       }
       prevRunActive.current = s.drain.run.active;
       setItems(next);
-      setStats(s);
+      setStats({ ...s, receivedAt: Date.now() });
       setLoaded(true);
     } finally {
       inFlight.current = false;
@@ -189,19 +188,15 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
     }
   }, [api, syncing, load, say]);
 
-  // auto-sync: on load if stale, then every few minutes while visible
+  // First visit with an empty inbox: fetch once. After that, syncing is manual.
   useEffect(() => {
     if (!loaded || !stats || autoSynced.current) return;
     autoSynced.current = true;
-    if (!stats.lastSyncedAt || Date.now() - stats.lastSyncedAt > AUTO_SYNC_MS) {
+    if (!stats.lastSyncedAt && !stats.sync.active && items.length === 0) {
       const t = setTimeout(sync, 0);
       return () => clearTimeout(t);
     }
-  }, [loaded, stats, sync]);
-  useEffect(() => {
-    const id = setInterval(() => { if (document.visibilityState === "visible") sync(); }, AUTO_SYNC_MS);
-    return () => clearInterval(id);
-  }, [sync]);
+  }, [loaded, stats, items.length, sync]);
 
   async function feedback(m: MessageView, kind: FeedbackKind, value?: string) {
     if (kind === "corrected_category" && value && m.category) {
@@ -236,15 +231,30 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
   const compact = !expanded;
   const firstSync = !stats?.lastSyncedAt && syncActive;
 
+  // header readout: fetch progress with a rough time left, then sort progress
+  let status: React.ReactNode = "";
+  if (syncActive && stats) {
+    const { phase, done, total, startedAt } = stats.sync;
+    if (phase === "listing" || !total) status = "Fetching inbox…";
+    else {
+      const elapsed = startedAt ? (stats.receivedAt - startedAt) / 1000 : 0;
+      const rate = elapsed > 3 && done > 0 ? done / elapsed : 0;
+      const left = rate ? Math.ceil((total - done) / rate / 60) : null;
+      status = <>Fetching {done.toLocaleString()} of {total.toLocaleString()}{left ? ` · about ${left} min left` : ""}</>;
+    }
+  } else if (runActive && run) {
+    status = <>Sorting {run.classified.toLocaleString()} of {run.total.toLocaleString()}</>;
+  } else if (pending > 0) {
+    status = `${pending.toLocaleString()} waiting to sort`;
+  } else if (stats?.lastSyncedAt) {
+    status = <>Synced {ago(stats.lastSyncedAt)} · <button onClick={sync} className="text-ash underline decoration-hair-strong underline-offset-4 hover:text-ink">Sync now</button></>;
+  }
+
   return (
     <div className="mx-auto w-full max-w-[1040px] px-6">
       <header className="relative flex flex-col items-center gap-3 py-8">
         <span className="text-[24px] font-light tracking-[0.08em] text-ink" title={email}>Jevmail</span>
-        <div className="text-[12px] tracking-[0.02em] text-ash md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2">
-          {syncActive ? "Syncing…" : pending > 0 ? `${pending} sorting` : stats?.lastSyncedAt ? (
-            <>Synced {ago(stats.lastSyncedAt)} · <button onClick={sync} className="text-ash underline decoration-hair-strong underline-offset-4 hover:text-ink">Sync now</button></>
-          ) : ""}
-        </div>
+        <div className="text-[12px] tracking-[0.02em] tabular-nums text-ash md:absolute md:left-0 md:top-1/2 md:-translate-y-1/2">{status}</div>
         <div className="absolute right-0 top-8 md:top-1/2 md:-translate-y-1/2">{signOut}</div>
       </header>
 
@@ -300,7 +310,7 @@ export default function Stage({ email, signOut, api = apiClient }: { email: stri
             onSelect={setSelectedId}
             onDone={done}
             onMove={move}
-            emptyText={firstSync ? "Syncing your inbox for the first time…" : pending > 0 && selected === "needs_reply" ? "Sorting…" : selected === "needs_reply" ? "Nothing needs a reply." : `Nothing in ${LABEL[selected]}.`}
+            emptyText={firstSync ? "Fetching your inbox. Sorting starts when that finishes." : pending > 0 ? "Sorting…" : selected === "needs_reply" ? "Nothing needs a reply." : `Nothing in ${LABEL[selected]}.`}
           />
         )}
       </section>

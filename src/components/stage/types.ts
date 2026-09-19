@@ -18,7 +18,7 @@ export type StageStats = {
       usd: number; rateLimited: boolean; error: string | null; elapsedMs: number; perSec: number; recent: Decision[];
     };
   };
-  sync: { active: boolean; phase: "idle" | "listing" | "fetching"; done: number; total: number };
+  sync: { active: boolean; phase: "idle" | "listing" | "fetching"; done: number; total: number; startedAt: number | null };
 };
 
 /** Everything the stage needs from the outside world. The app passes fetch calls; the preview passes a simulator. */

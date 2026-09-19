@@ -28,7 +28,7 @@ function weightedCategory(r: number): Category {
 
 export class Simulator implements StageApi {
   private msgs: (MessageView & { truth: Category; fetched: boolean })[] = [];
-  private syncState: StageStats["sync"] = { active: false, phase: "idle", done: 0, total: 0 };
+  private syncState: StageStats["sync"] = { active: false, phase: "idle", done: 0, total: 0, startedAt: null };
   private run: StageStats["drain"]["run"] = { active: false, startedAt: null, finishedAt: null, total: 0, classified: 0, usd: 0, rateLimited: false, error: null, elapsedMs: 0, perSec: 0, recent: [] };
   private timer: ReturnType<typeof setInterval> | null = null;
   private lastSyncedAt: number | null = null;
@@ -71,7 +71,7 @@ export class Simulator implements StageApi {
   async sync() {
     if (this.syncState.active) return { ok: false, error: "already running" };
     const toFetch = this.msgs.filter((m) => !m.fetched);
-    this.syncState = { active: true, phase: "listing", done: 0, total: toFetch.length };
+    this.syncState = { active: true, phase: "listing", done: 0, total: toFetch.length, startedAt: Date.now() };
     await new Promise((r) => setTimeout(r, 400));
     this.syncState.phase = "fetching";
     for (let i = 0; i < toFetch.length; i += 20) {

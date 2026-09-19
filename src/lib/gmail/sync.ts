@@ -20,6 +20,9 @@ import { env } from "@/lib/env";
 // steady enough; on a 429 the floor doubles for the rest of the run.
 const BATCH = 10;
 const BATCH_FLOOR_MS = 500;
+// After Gmail throttles once, drop to a rate a low-quota project can sustain (~100 messages/min).
+const SLOW_BATCH = 5;
+const SLOW_FLOOR_MS = 3000;
 
 export type SyncProgress = { active: boolean; phase: "idle" | "listing" | "fetching"; done: number; total: number; startedAt: number | null };
 const sp = globalThis as unknown as { __jevmailSyncProgress?: SyncProgress };
@@ -45,8 +48,8 @@ function isQuotaError(err: unknown): boolean {
 
 let throttled = false;
 async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
-  // Gmail's burst limit recovers within seconds; long waits just stall the fetch.
-  const waits = [2_000, 4_000, 8_000, 16_000];
+  // The per-minute quota resets on the minute; the last wait outlasts a full window.
+  const waits = [5_000, 15_000, 30_000, 65_000];
   for (let attempt = 0; ; attempt++) {
     try {
       return await fn();
@@ -210,19 +213,29 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db): Promise<SyncFetchRes
   setProgress({ phase: "fetching", done: 0, total: toFetch.length });
 
   const inserted: StoredMessage[] = [];
-  for (let i = 0; i < toFetch.length; i += BATCH) {
+  let skipped = 0;
+  for (let i = 0; i < toFetch.length; ) {
+    const size = throttled ? SLOW_BATCH : BATCH;
     const started = Date.now();
     const batch = await Promise.all(
-      toFetch.slice(i, i + BATCH).map(async (id) => {
-        const res = await withRetry(
-          () => gmail.users.messages.get({ userId: "me", id, format: "full" }),
-          "messages.get",
-        );
-        // history.list can report messages later removed from the inbox; keep only current inbox mail
-        if (mode === "incremental" && !res.data.labelIds?.includes("INBOX")) return null;
-        return parseMessage(res.data);
+      toFetch.slice(i, i + size).map(async (id) => {
+        try {
+          const res = await withRetry(
+            () => gmail.users.messages.get({ userId: "me", id, format: "full" }),
+            "messages.get",
+          );
+          // history.list can report messages later removed from the inbox; keep only current inbox mail
+          if (mode === "incremental" && !res.data.labelIds?.includes("INBOX")) return null;
+          return parseMessage(res.data);
+        } catch (err) {
+          // One stubborn message must not sink the whole fetch; it is picked up next sync.
+          console.warn(`[gmail] skipping ${id}: ${(err as Error).message?.slice(0, 80)}`);
+          skipped++;
+          return null;
+        }
       }),
     );
+    i += size;
     const now = Date.now();
     for (const m of batch) {
       if (!m) continue;
@@ -230,18 +243,19 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db): Promise<SyncFetchRes
       db.insert(schema.messages).values({ ...row, syncedAt: now }).onConflictDoNothing().run();
       inserted.push(row);
     }
-    setProgress({ done: Math.min(toFetch.length, i + BATCH) });
-    const floor = throttled ? BATCH_FLOOR_MS * 2 : BATCH_FLOOR_MS;
+    setProgress({ done: Math.min(toFetch.length, i) });
+    const floor = throttled ? SLOW_FLOOR_MS : BATCH_FLOOR_MS;
     const elapsed = Date.now() - started;
-    if (elapsed < floor && i + BATCH < toFetch.length) await sleep(floor - elapsed);
+    if (elapsed < floor && i < toFetch.length) await sleep(floor - elapsed);
   }
+  if (skipped) console.warn(`[gmail] ${skipped} messages skipped this run; they will be retried next sync`);
 
   // Only advance the bookmark once every candidate has been pulled; otherwise
   // the next run re-lists and skips what is already stored.
-  if (remaining === 0) setSyncState(db, nextHistoryId);
+  if (remaining === 0 && skipped === 0) setSyncState(db, nextHistoryId);
   else setSyncState(db, state?.lastHistoryId ?? null);
 
-  return { inserted, remaining, mode };
+  return { inserted, remaining: remaining + skipped, mode };
 }
 
 /** Messages stored earlier that never got a classification (gateway errors, interrupted runs). */

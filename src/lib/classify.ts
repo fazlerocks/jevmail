@@ -128,6 +128,9 @@ export async function classifyMessage(m: ClassifyInput): Promise<Classification>
       }
     } else if (status === 403) {
       throw new GatewayForbiddenError((err as GatewayErr).message ?? "forbidden");
+    } else if (status !== undefined && status >= 500) {
+      await new Promise((r) => setTimeout(r, 1500));
+      result = await run();
     } else {
       throw err;
     }
