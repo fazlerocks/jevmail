@@ -15,8 +15,11 @@ import { env } from "@/lib/env";
  *   5,000 units per minute, well under the limit.
  */
 
-const BATCH = 20; // 20 x messages.get (5 units) per 600 ms = 10,000 units/min, under the 15,000 limit
-const BATCH_FLOOR_MS = 600;
+// Gmail throttles bursts well below its documented 250 units/s. Measured: 120 full
+// message fetches in 4 s triggered a lockout. 10 per 500 ms (20/s, 100 units/s) is
+// steady enough; on a 429 the floor doubles for the rest of the run.
+const BATCH = 10;
+const BATCH_FLOOR_MS = 500;
 
 export type SyncProgress = { active: boolean; phase: "idle" | "listing" | "fetching"; done: number; total: number; startedAt: number | null };
 const sp = globalThis as unknown as { __jevmailSyncProgress?: SyncProgress };
@@ -40,8 +43,10 @@ function isQuotaError(err: unknown): boolean {
   return status === 429 || (status === 403 && /quota|rate ?limit/i.test(msg));
 }
 
+let throttled = false;
 async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
-  const waits = [15_000, 30_000, 60_000];
+  // Gmail's burst limit recovers within seconds; long waits just stall the fetch.
+  const waits = [2_000, 4_000, 8_000, 16_000];
   for (let attempt = 0; ; attempt++) {
     try {
       return await fn();
@@ -49,6 +54,7 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
       const status = statusOf(err);
       const retryable = isQuotaError(err) || (status !== undefined && status >= 500);
       if (!retryable || attempt >= waits.length) throw err;
+      if (isQuotaError(err)) throttled = true;
       console.warn(`[gmail] ${label} got ${status}, waiting ${waits[attempt] / 1000}s (attempt ${attempt + 1})`);
       await sleep(waits[attempt]);
     }
@@ -154,6 +160,7 @@ export type SyncFetchResult = {
  */
 export async function fetchNewMessages(gmail: Gmail, db: Db): Promise<SyncFetchResult> {
   setProgress({ active: true, phase: "listing", done: 0, total: 0, startedAt: Date.now() });
+  throttled = false;
   try {
     return await fetchNewMessagesInner(gmail, db);
   } finally {
@@ -224,8 +231,9 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db): Promise<SyncFetchRes
       inserted.push(row);
     }
     setProgress({ done: Math.min(toFetch.length, i + BATCH) });
+    const floor = throttled ? BATCH_FLOOR_MS * 2 : BATCH_FLOOR_MS;
     const elapsed = Date.now() - started;
-    if (elapsed < BATCH_FLOOR_MS && i + BATCH < toFetch.length) await sleep(BATCH_FLOOR_MS - elapsed);
+    if (elapsed < floor && i + BATCH < toFetch.length) await sleep(floor - elapsed);
   }
 
   // Only advance the bookmark once every candidate has been pulled; otherwise
