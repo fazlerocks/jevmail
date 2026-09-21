@@ -7,6 +7,7 @@ export const messages = sqliteTable(
   "messages",
   {
     id: text("id").primaryKey(),
+    userEmail: text("user_email").notNull().default(""),
     threadId: text("thread_id").notNull(),
     fromName: text("from_name").notNull().default(""),
     fromEmail: text("from_email").notNull().default(""),
@@ -18,7 +19,11 @@ export const messages = sqliteTable(
     isReplyToMe: integer("is_reply_to_me", { mode: "boolean" }).notNull().default(false),
     syncedAt: integer("synced_at").notNull(),
   },
-  (t) => [index("messages_received_idx").on(t.receivedAt), index("messages_domain_idx").on(t.fromDomain)],
+  (t) => [
+    index("messages_received_idx").on(t.receivedAt),
+    index("messages_domain_idx").on(t.fromDomain),
+    index("messages_user_idx").on(t.userEmail),
+  ],
 );
 
 export const classifications = sqliteTable("classifications", {
@@ -52,8 +57,14 @@ export const feedback = sqliteTable(
   (t) => [index("feedback_message_idx").on(t.messageId)],
 );
 
-export const syncState = sqliteTable("sync_state", {
-  id: integer("id").primaryKey(),
-  lastHistoryId: text("last_history_id"),
-  lastSyncedAt: integer("last_synced_at"),
-});
+export const syncState = sqliteTable(
+  "sync_state",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userEmail: text("user_email").notNull().default(""),
+    lastHistoryId: text("last_history_id"),
+    lastSyncedAt: integer("last_synced_at"),
+  },
+  (t) => [index("sync_state_user_idx").on(t.userEmail)],
+);
+

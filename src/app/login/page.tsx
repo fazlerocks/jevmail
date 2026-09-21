@@ -9,8 +9,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { reason } = await searchParams;
   if (missing.length === 0) {
     const session = await auth();
-    if (session?.accessToken && !session.error) redirect("/");
+    if (session?.user?.email && !session.error) redirect("/");
   }
+
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">

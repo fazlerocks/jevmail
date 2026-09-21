@@ -69,6 +69,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   session: { strategy: "jwt" },
   callbacks: {
+    async signIn({ user }) {
+      const allowed = process.env.ALLOWED_EMAIL;
+      if (allowed && user.email) {
+        const allowedList = allowed.split(",").map((e) => e.trim().toLowerCase());
+        if (!allowedList.includes(user.email.toLowerCase())) {
+          console.warn(`[auth] access denied for ${user.email}; not in ALLOWED_EMAIL`);
+          return false;
+        }
+      }
+      return true;
+    },
     async jwt({ token, account }) {
       const t = token as typeof token & GoogleToken;
       if (account) {
@@ -86,10 +97,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       const t = token as typeof token & GoogleToken;
-      session.accessToken = t.access_token;
+      // Do NOT expose access_token to the client session object (/api/auth/session)
       session.error = t.error;
       return session;
     },
   },
   pages: { signIn: "/login" },
 });
+

@@ -4,10 +4,11 @@ import { unclassifiedMessages } from "@/lib/gmail/sync";
 import { kickDrain } from "@/lib/drainer";
 
 /** Start sorting whatever is pending, right now. */
-export async function POST() {
-  const { session, response } = await requireSession();
-  if (!session) return response;
-  const pending = unclassifiedMessages(db).length;
+export async function POST(request: Request) {
+  const { session, userEmail, response } = await requireSession(request);
+  if (!session || !userEmail) return response;
+  const pending = unclassifiedMessages(db, userEmail).length;
   kickDrain();
   return Response.json({ pending });
 }
+

@@ -15,6 +15,13 @@
       "when": 1789828665800,
       "tag": "0001_zippy_nehzno",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789830000000,
+      "tag": "0002_user_isolation",
+      "breakpoints": true
     }
   ]
 }

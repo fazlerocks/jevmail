@@ -29,5 +29,7 @@ export const env = {
   jevAutoSort: process.env.JEV_AUTO_SORT !== "0",
   /** Background drain tick. Measured free-tier window is 5 calls per 299 s; 310 s keeps a margin. Set 0 to disable. */
   jevDrainIntervalMs: Number(process.env.JEV_DRAIN_INTERVAL_MS ?? 310_000),
+  allowedEmail: process.env.ALLOWED_EMAIL?.trim() || null,
   hasGatewayKey: () => Boolean(process.env.AI_GATEWAY_API_KEY),
 };
+

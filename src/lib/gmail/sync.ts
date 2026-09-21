@@ -1,8 +1,9 @@
-import { inArray, eq, isNull, sql } from "drizzle-orm";
+import { inArray, eq, isNull, sql, and } from "drizzle-orm";
 import type { Gmail } from "./client";
 import { parseMessage, type ParsedMessage } from "./parse";
 import { type Db, schema } from "@/db";
 import { env } from "@/lib/env";
+
 
 /**
  * READ-ONLY. The only Gmail methods used anywhere in this app:
@@ -110,9 +111,13 @@ async function currentHistoryId(gmail: Gmail): Promise<string> {
   return String(res.data.historyId);
 }
 
-/** The next `limit` inbox messages older than everything stored. */
-async function listOlderInboxIds(gmail: Gmail, db: Db, limit: number): Promise<string[]> {
-  const oldest = db.select({ t: sql<number>`min(${schema.messages.receivedAt})` }).from(schema.messages).get()?.t;
+/** The next `limit` inbox messages older than everything stored for this user. */
+async function listOlderInboxIds(gmail: Gmail, db: Db, userEmail: string, limit: number): Promise<string[]> {
+  const oldest = db
+    .select({ t: sql<number>`min(${schema.messages.receivedAt})` })
+    .from(schema.messages)
+    .where(eq(schema.messages.userEmail, userEmail))
+    .get()?.t;
   const q = oldest ? `in:inbox before:${Math.floor(oldest / 1000)}` : "in:inbox";
   const ids: string[] = [];
   let pageToken: string | undefined;
@@ -149,21 +154,25 @@ async function sentThreadIds(gmail: Gmail, days: number): Promise<Set<string>> {
   return ids;
 }
 
-function getSyncState(db: Db) {
-  return db.select().from(schema.syncState).where(eq(schema.syncState.id, 1)).get();
+function getSyncState(db: Db, userEmail: string) {
+  return db.select().from(schema.syncState).where(eq(schema.syncState.userEmail, userEmail)).get();
 }
 
-function setSyncState(db: Db, lastHistoryId: string | null) {
-  db.insert(schema.syncState)
-    .values({ id: 1, lastHistoryId, lastSyncedAt: Date.now() })
-    .onConflictDoUpdate({
-      target: schema.syncState.id,
-      set: { lastHistoryId, lastSyncedAt: Date.now() },
-    })
-    .run();
+function setSyncState(db: Db, userEmail: string, lastHistoryId: string | null) {
+  const existing = getSyncState(db, userEmail);
+  if (existing) {
+    db.update(schema.syncState)
+      .set({ lastHistoryId, lastSyncedAt: Date.now() })
+      .where(eq(schema.syncState.userEmail, userEmail))
+      .run();
+  } else {
+    db.insert(schema.syncState)
+      .values({ userEmail, lastHistoryId, lastSyncedAt: Date.now() })
+      .run();
+  }
 }
 
-export type StoredMessage = ParsedMessage & { isReplyToMe: boolean };
+export type StoredMessage = ParsedMessage & { isReplyToMe: boolean; userEmail?: string };
 
 export type SyncFetchResult = {
   inserted: StoredMessage[];
@@ -178,25 +187,37 @@ export type SyncFetchResult = {
  */
 export const CHUNK = 100; // sorting starts as soon as this many have landed, and again for each chunk after
 
-export async function fetchNewMessages(gmail: Gmail, db: Db, older = false, onChunk?: () => void): Promise<SyncFetchResult> {
+export async function fetchNewMessages(
+  gmail: Gmail,
+  db: Db,
+  userEmail: string,
+  older = false,
+  onChunk?: () => void,
+): Promise<SyncFetchResult> {
   setProgress({ active: true, phase: "listing", done: 0, total: 0, startedAt: Date.now() });
   throttled = false;
   try {
-    return await fetchNewMessagesInner(gmail, db, older, onChunk);
+    return await fetchNewMessagesInner(gmail, db, userEmail, older, onChunk);
   } finally {
     setProgress({ active: false, phase: "idle" });
   }
 }
 
-async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean, onChunk?: () => void): Promise<SyncFetchResult> {
-  const state = getSyncState(db);
+async function fetchNewMessagesInner(
+  gmail: Gmail,
+  db: Db,
+  userEmail: string,
+  older: boolean,
+  onChunk?: () => void,
+): Promise<SyncFetchResult> {
+  const state = getSyncState(db, userEmail);
   let candidateIds: string[];
   let nextHistoryId: string;
   let mode: SyncFetchResult["mode"];
 
   if (older) {
     // "Fetch more": reach further back. The history bookmark is left untouched.
-    candidateIds = await listOlderInboxIds(gmail, db, env.fetchMoreLimit);
+    candidateIds = await listOlderInboxIds(gmail, db, userEmail, env.fetchMoreLimit);
     nextHistoryId = state?.lastHistoryId ?? (await currentHistoryId(gmail));
     mode = "older";
   } else if (state?.lastHistoryId) {
@@ -208,8 +229,8 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean, onChu
     } catch (err) {
       if (statusOf(err) === 404) {
         console.warn("[gmail] history id too old, falling back to full sync");
-        setSyncState(db, null);
-        return fetchNewMessagesInner(gmail, db, false, onChunk);
+        setSyncState(db, userEmail, null);
+        return fetchNewMessagesInner(gmail, db, userEmail, false, onChunk);
       }
       throw err;
     }
@@ -223,7 +244,11 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean, onChu
   const known = new Set<string>();
   for (let i = 0; i < candidateIds.length; i += 500) {
     const slice = candidateIds.slice(i, i + 500);
-    for (const r of db.select({ id: schema.messages.id }).from(schema.messages).where(inArray(schema.messages.id, slice)).all()) {
+    for (const r of db
+      .select({ id: schema.messages.id })
+      .from(schema.messages)
+      .where(and(inArray(schema.messages.id, slice), eq(schema.messages.userEmail, userEmail)))
+      .all()) {
       known.add(r.id);
     }
   }
@@ -261,8 +286,8 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean, onChu
     const now = Date.now();
     for (const m of batch) {
       if (!m) continue;
-      const row: StoredMessage = { ...m, isReplyToMe: sent.has(m.threadId) };
-      db.insert(schema.messages).values({ ...row, syncedAt: now }).onConflictDoNothing().run();
+      const row: StoredMessage = { ...m, isReplyToMe: sent.has(m.threadId), userEmail };
+      db.insert(schema.messages).values({ ...row, userEmail, syncedAt: now }).onConflictDoNothing().run();
       inserted.push(row);
     }
     setProgress({ done: Math.min(toFetch.length, i) });
@@ -275,20 +300,28 @@ async function fetchNewMessagesInner(gmail: Gmail, db: Db, older: boolean, onChu
 
   // Only advance the bookmark once every candidate has been pulled; otherwise
   // the next run re-lists and skips what is already stored.
-  if (mode === "older") setSyncState(db, state?.lastHistoryId ?? nextHistoryId);
-  else if (remaining === 0 && skipped === 0) setSyncState(db, nextHistoryId);
-  else setSyncState(db, state?.lastHistoryId ?? null);
+  if (mode === "older") setSyncState(db, userEmail, state?.lastHistoryId ?? nextHistoryId);
+  else if (remaining === 0 && skipped === 0) setSyncState(db, userEmail, nextHistoryId);
+  else setSyncState(db, userEmail, state?.lastHistoryId ?? null);
 
   return { inserted, remaining: remaining + skipped, mode };
 }
 
 /** Messages stored earlier that never got a classification (gateway errors, interrupted runs). */
-export function unclassifiedMessages(db: Db): StoredMessage[] {
-  return db
+export function unclassifiedMessages(db: Db, userEmail?: string): StoredMessage[] {
+  const query = db
     .select({ m: schema.messages })
     .from(schema.messages)
-    .leftJoin(schema.classifications, eq(schema.classifications.messageId, schema.messages.id))
-    .where(isNull(schema.classifications.messageId))
+    .leftJoin(schema.classifications, eq(schema.classifications.messageId, schema.messages.id));
+
+  const conditions = [isNull(schema.classifications.messageId)];
+  if (userEmail) {
+    conditions.push(eq(schema.messages.userEmail, userEmail));
+  }
+
+  return query
+    .where(and(...conditions))
     .all()
-    .map(({ m }) => m);
+    .map(({ m }) => m as StoredMessage);
 }
+

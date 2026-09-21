@@ -3,10 +3,10 @@ import { addFeedback, getMessage } from "@/lib/queries";
 import { CATEGORIES, FEEDBACK_KINDS, type FeedbackKind } from "@/db/schema";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { session, response } = await requireSession();
-  if (!session) return response;
+  const { session, userEmail, response } = await requireSession(request);
+  if (!session || !userEmail) return response;
   const { id } = await params;
-  if (!getMessage(id)) return Response.json({ error: "not found" }, { status: 404 });
+  if (!getMessage(id, userEmail)) return Response.json({ error: "not found" }, { status: 404 });
 
   const body = (await request.json().catch(() => ({}))) as { kind?: string; value?: string };
   if (!body.kind || !(FEEDBACK_KINDS as readonly string[]).includes(body.kind)) {
@@ -15,6 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (body.kind === "corrected_category" && !(CATEGORIES as readonly string[]).includes(body.value ?? "")) {
     return Response.json({ error: "invalid category" }, { status: 400 });
   }
-  addFeedback(id, body.kind as FeedbackKind, body.value);
-  return Response.json({ ok: true, message: getMessage(id) });
+  addFeedback(id, userEmail, body.kind as FeedbackKind, body.value);
+  return Response.json({ ok: true, message: getMessage(id, userEmail) });
 }
+
