@@ -47,24 +47,28 @@ function feedbackSummaries(): Map<string, FeedbackSummary> {
   return map;
 }
 
-// Reads are polled every 300 ms during a live run; a 150 ms cache keeps them cheap
-// while writes (which happen in this same process) still show up within a poll.
-let viewsCache: { at: number; views: MessageView[] } | null = null;
-export function invalidateViews() { viewsCache = null; }
+// User-isolated cache: reads are polled every 300 ms; 150 ms keeps them cheap per user
+const viewsCache = new Map<string, { at: number; views: MessageView[] }>();
+export function invalidateViews(userEmail?: string) {
+  if (userEmail) viewsCache.delete(userEmail);
+  else viewsCache.clear();
+}
 
-function allViews(): MessageView[] {
-  if (viewsCache && Date.now() - viewsCache.at < 150) return viewsCache.views;
-  const views = buildViews();
-  viewsCache = { at: Date.now(), views };
+function allViews(userEmail: string): MessageView[] {
+  const cached = viewsCache.get(userEmail);
+  if (cached && Date.now() - cached.at < 150) return cached.views;
+  const views = buildViews(userEmail);
+  viewsCache.set(userEmail, { at: Date.now(), views });
   return views;
 }
 
-function buildViews(): MessageView[] {
+function buildViews(userEmail: string): MessageView[] {
   const fb = feedbackSummaries();
   const rows = db
     .select({ m: schema.messages, c: schema.classifications })
     .from(schema.messages)
     .leftJoin(schema.classifications, eq(schema.classifications.messageId, schema.messages.id))
+    .where(eq(schema.messages.userEmail, userEmail))
     .orderBy(desc(schema.messages.receivedAt))
     .all();
   return rows.map(({ m, c }) => {
@@ -93,8 +97,8 @@ function buildViews(): MessageView[] {
   });
 }
 
-export function listMessages(opts: { lane: Lane; includeHandled: boolean; offset: number; limit: number }) {
-  let items = allViews();
+export function listMessages(opts: { userEmail: string; lane: Lane; includeHandled: boolean; offset: number; limit: number }) {
+  let items = allViews(opts.userEmail);
   if (!opts.includeHandled) items = items.filter((v) => !v.handled);
   if (opts.lane === "pending") items = items.filter((v) => v.category === null);
   else if (opts.lane !== "all") items = items.filter((v) => v.category === opts.lane);
@@ -107,17 +111,20 @@ export function listMessages(opts: { lane: Lane; includeHandled: boolean; offset
   return { items: page, nextOffset, total: items.length };
 }
 
-export function getMessage(id: string): MessageView | null {
-  return allViews().find((v) => v.id === id) ?? null;
+export function getMessage(id: string, userEmail: string): MessageView | null {
+  return allViews(userEmail).find((v) => v.id === id) ?? null;
 }
 
-export function addFeedback(messageId: string, kind: FeedbackKind, value?: string) {
+export function addFeedback(messageId: string, userEmail: string, kind: FeedbackKind, value?: string) {
+  // Ensure message belongs to authenticated user
+  const msg = getMessage(messageId, userEmail);
+  if (!msg) return;
   db.insert(schema.feedback).values({ messageId, kind, value: value ?? null, createdAt: Date.now() }).run();
-  invalidateViews();
+  invalidateViews(userEmail);
 }
 
-export function stats() {
-  const all = allViews();
+export function stats(userEmail: string) {
+  const all = allViews(userEmail);
   const lanes: Record<string, number> = { pending: 0 };
   for (const c of CATEGORIES) lanes[c] = 0;
   let classified = 0;
@@ -129,8 +136,14 @@ export function stats() {
   }
   const agreement = classified === 0 ? 1 : (classified - corrected) / classified;
 
-  const st = db.select().from(schema.syncState).where(eq(schema.syncState.id, 1)).get();
-  const tokens = db.select({ n: sql<number>`coalesce(sum(${schema.classifications.inputTokens}), 0)` }).from(schema.classifications).get()?.n ?? 0;
+  const st = db.select().from(schema.syncState).where(eq(schema.syncState.userEmail, userEmail)).get();
+  const tokens = db
+    .select({ n: sql<number>`coalesce(sum(${schema.classifications.inputTokens}), 0)` })
+    .from(schema.classifications)
+    .innerJoin(schema.messages, eq(schema.messages.id, schema.classifications.messageId))
+    .where(eq(schema.messages.userEmail, userEmail))
+    .get()?.n ?? 0;
+
   return {
     lanes,
     classified,

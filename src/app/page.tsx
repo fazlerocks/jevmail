@@ -7,8 +7,9 @@ export default async function Home() {
   const missing = missingEnv();
   if (missing.length > 0) redirect("/login");
   const session = await auth();
-  if (!session?.accessToken) redirect("/login");
+  if (!session?.user?.email) redirect("/login");
   if (session.error) redirect("/login?reason=expired");
+
 
   return (
     <main className="h-screen">

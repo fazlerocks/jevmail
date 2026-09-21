@@ -32,11 +32,12 @@ export type StageApi = {
 export const apiClient: StageApi = {
   async load(showDone) {
     const [m, s] = await Promise.all([
-      fetch(`/api/messages?lane=all&includeHandled=${showDone}&limit=10000`).then((r) => r.json()),
+      fetch(`/api/messages?lane=all&includeHandled=${showDone}&limit=1000`).then((r) => r.json()),
       fetch("/api/stats").then((r) => r.json()),
     ]);
     return { items: m.items ?? [], stats: s };
   },
+
   async sync(older = false) {
     const r = await fetch(older ? "/api/sync?older=1" : "/api/sync", { method: "POST" });
     const d = await r.json();
